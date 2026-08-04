@@ -923,14 +923,22 @@ function renderProfileKitGrid(name) {
   container.innerHTML = html;
 }
 
+const KNOWN_ASSET_SKINS = new Set([
+  "farxd", "game1k", "rangee", "sample", "system1117", 
+  "timmyloal", "vorthexis", "x9jm", "ziadlive"
+]);
+
 function getPlayerSkinSrc(name) {
   if (!name) return 'assets/steve.png';
-  const pDetail = (DATA.Players || []).find(p => (typeof p === 'object' ? p.name : p).toLowerCase() === name.toLowerCase()) || {};
+  const cleanName = name.toLowerCase().trim();
+  const pDetail = (DATA.Players || []).find(p => (typeof p === 'object' ? p.name : p).toLowerCase() === cleanName) || {};
   if (pDetail.skinUrl && pDetail.skinUrl.trim()) {
     return pDetail.skinUrl.trim();
   }
-  const cleanName = name.toLowerCase();
-  return `assets/${cleanName}.png`;
+  if (KNOWN_ASSET_SKINS.has(cleanName)) {
+    return `assets/${cleanName}.png`;
+  }
+  return 'assets/steve.png';
 }
 
 function getPlayerKitBadges(name) {
