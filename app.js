@@ -751,17 +751,108 @@ async function openProfile(name) {
   renderProfileKitGrid(name);
   renderProfileDuels(name);
 
+  if (window.history && window.history.replaceState) {
+    window.history.replaceState(null, '', `?player=${encodeURIComponent(name)}`);
+  }
+
   overlay.classList.add('active');
 }
 
 function closeProfileModal() {
   document.getElementById('profileModalOverlay').classList.remove('active');
+  if (window.history && window.history.replaceState) {
+    window.history.replaceState(null, '', window.location.pathname);
+  }
 }
 
 function closeModalOnBackdrop(e) {
   if (e.target.id === 'profileModalOverlay') {
     closeProfileModal();
   }
+}
+
+function handleUrlParamsOnLoad() {
+  const search = window.location.search;
+  const hash = window.location.hash;
+  let targetPlayer = null;
+
+  if (search) {
+    const params = new URLSearchParams(search);
+    if (params.has('player')) targetPlayer = params.get('player');
+    else if (params.has('p')) targetPlayer = params.get('p');
+    else {
+      const rawQuery = search.substring(1).trim();
+      if (rawQuery && !rawQuery.includes('=')) {
+        targetPlayer = rawQuery;
+      }
+    }
+  }
+
+  if (!targetPlayer && hash) {
+    const rawHash = hash.substring(1).trim();
+    if (rawHash.startsWith('player=')) targetPlayer = rawHash.replace('player=', '');
+    else if (!rawHash.includes('=')) targetPlayer = rawHash;
+  }
+
+  if (targetPlayer) {
+    const cleanName = decodeURIComponent(targetPlayer).replace(/\+/g, ' ').trim();
+    if (cleanName) {
+      setTimeout(() => {
+        openProfile(cleanName);
+      }, 200);
+    }
+  }
+}
+
+function copyProfileLink(playerName) {
+  const pName = playerName || CURRENT_PLAYER || '';
+  if (!pName) return;
+  const baseUrl = window.location.origin + window.location.pathname;
+  const shareUrl = `${baseUrl}?player=${encodeURIComponent(pName)}`;
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(shareUrl).then(() => {
+      showToast(`🔗 Copied profile link for ${pName}!`);
+    }).catch(() => {
+      prompt("Copy this share link:", shareUrl);
+    });
+  } else {
+    prompt("Copy this share link:", shareUrl);
+  }
+}
+
+function copyEmbedCode(playerName) {
+  const pName = playerName || CURRENT_PLAYER || '';
+  if (!pName) return;
+  const embedCode = `<iframe src="${window.location.origin}${window.location.pathname}?player=${encodeURIComponent(pName)}" width="500" height="600" frameborder="0"></iframe>`;
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(embedCode).then(() => {
+      showToast(`⚡ Copied embed code for ${pName}!`);
+    }).catch(() => {
+      prompt("Copy embed code:", embedCode);
+    });
+  } else {
+    prompt("Copy embed code:", embedCode);
+  }
+}
+
+function showToast(msg) {
+  let toast = document.getElementById('toastNotification');
+  if (!toast) {
+    toast = document.createElement('div');
+    toast.id = 'toastNotification';
+    toast.style.cssText = `
+      position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
+      background: rgba(13, 27, 42, 0.95); border: 1px solid var(--cyan);
+      box-shadow: 0 0 20px rgba(0, 238, 255, 0.4); color: #fff;
+      padding: 12px 24px; border-radius: 30px; font-family: var(--font-heading);
+      font-size: 0.9rem; font-weight: 700; z-index: 10000; opacity: 0; transition: opacity 0.3s ease;
+      pointer-events: none;
+    `;
+    document.body.appendChild(toast);
+  }
+  toast.innerText = msg;
+  toast.style.opacity = '1';
+  setTimeout(() => { toast.style.opacity = '0'; }, 3000);
 }
 
 function animatePointsCount(targetPts) {
