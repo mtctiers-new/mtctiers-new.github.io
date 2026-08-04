@@ -911,6 +911,11 @@ function renderProfileKitGrid(name) {
 }
 
 function getPlayerSkinSrc(name) {
+  if (!name) return 'assets/steve.png';
+  const pDetail = (DATA.Players || []).find(p => (typeof p === 'object' ? p.name : p).toLowerCase() === name.toLowerCase()) || {};
+  if (pDetail.skinUrl && pDetail.skinUrl.trim()) {
+    return pDetail.skinUrl.trim();
+  }
   const cleanName = name.toLowerCase();
   return `assets/${cleanName}.png`;
 }
