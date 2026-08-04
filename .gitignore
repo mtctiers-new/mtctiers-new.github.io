@@ -1,6 +1,12 @@
-node_modules/
-bot/node_modules/
 .env
-bot/.env
+*.env
+bot/
+node_modules/
+*.rules
+*.json.rules
+database.rules.json
+firestore.rules
+server.py
+app_script.js
 .DS_Store
 *.log
