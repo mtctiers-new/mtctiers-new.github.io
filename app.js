@@ -616,21 +616,35 @@ async function renderDuelsView(playerFilter) {
 async function renderProfileDuels(playerName) {
   document.querySelectorAll('.profile-duel-section').forEach(el => el.remove());
   const metaBox = document.querySelector('.player-meta-box');
-  if (!metaBox) return;
 
   try {
     let duels = await fetchDuelsFromFirestore(playerName);
 
     if (!duels || !duels.length) {
       const base = AUTH_API.replace('/api', '');
-      const res = await fetch(`${base}/api/duels?player=${encodeURIComponent(playerName)}&limit=1`);
+      const res = await fetch(`${base}/api/duels?player=${encodeURIComponent(playerName)}&limit=50`);
       if (res.ok) {
         const data = await res.json();
         duels = data.duels || [];
       }
     }
 
-    if (!duels.length) return;
+    let wins = 0;
+    let losses = 0;
+    if (duels && Array.isArray(duels)) {
+      duels.forEach(d => {
+        const info = duelPerspective(d, playerName);
+        if (info.won) wins++;
+        else losses++;
+      });
+    }
+
+    const pWLEl = document.getElementById('pWL');
+    if (pWLEl) {
+      pWLEl.innerText = `${wins}W / ${losses}L`;
+    }
+
+    if (!metaBox || !duels || !duels.length) return;
 
     const d = duels[0];
     const info = duelPerspective(d, playerName);
