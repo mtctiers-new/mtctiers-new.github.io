@@ -79,6 +79,19 @@ async function loadRankingsData() {
     const res = await fetch(`data/rankings.json?v=${Date.now()}`);
     DATA = await res.json();
 
+    try {
+      const fsRes = await fetch("https://firestore.googleapis.com/v1/projects/mtctiers/databases/(default)/documents/rankings/players_meta");
+      if (fsRes.ok) {
+        const fsDoc = await fsRes.json();
+        const rawPlayers = fsDoc.fields?.players?.arrayValue?.values || [];
+        if (rawPlayers.length) {
+          DATA.Players = rawPlayers.map(item => parseFirestoreMap(item.mapValue?.fields || {}));
+        }
+      }
+    } catch (e) {
+      console.warn("Firestore players_meta fetch note:", e.message);
+    }
+
     computeOverallPoints();
     renderCurrentTab();
   } catch (err) {
