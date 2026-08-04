@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-RGZ8Z63C6V"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+
+    gtag('config', 'G-RGZ8Z63C6V');
+  </script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MTC TIERS - Official Player Rankings & Profiles</title>
+  <meta name="description" content="Official Minecraft MultiCraft PvP Tierlist, Rankings, Player Avatars & Profile Modals.">
+
+  <link rel="icon" type="image/x-icon" href="assets/favicon.ico">
+
+  <link rel="stylesheet" href="index.css">
+
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+</head>
+<body>
+
+  <div id="enterScreen" class="enter-screen" onclick="enterSite()">
+    <div class="enter-content">
+      <img src="assets/mtctiers.png" alt="MTC Tiers Logo" class="enter-logo" onerror="this.src='assets/default.png'">
+      <h1 class="enter-title">MTC TIERS</h1>
+      <p class="enter-subtitle">OFFICIAL PLAYER RANKINGS & PROFILES</p>
+      <div class="enter-btn">
+        <span class="enter-icon">▶</span>
+        <span>CLICK TO ENTER</span>
+      </div>
+    </div>
+  </div>
+
+  <nav class="navbar">
+    <div class="nav-brand" onclick="switchTab('home')">
+      <img src="assets/mtctiers.png" alt="MTC Tiers Logo" class="nav-logo" onerror="this.src='assets/default.png'">
+      <span class="nav-title">MTC TIERS</span>
+    </div>
+
+    <div class="nav-links">
+      <div class="nav-link active" id="nav-home" onclick="switchTab('home')">OVERALL</div>
+      <div class="nav-link" id="nav-rankings" onclick="switchTab('rankings')">KITS</div>
+      <div class="nav-link" id="nav-rules" onclick="switchTab('rules')">RULES</div>
+      <div class="nav-link" id="nav-hof" onclick="switchTab('hof')">HALL OF FAME</div>
+      <div class="nav-link" id="nav-testers" onclick="switchTab('testers')">TESTERS</div>
+      <div class="nav-link" id="nav-duels" onclick="switchTab('duels')">DUELS</div>
+    </div>
+
+    <div class="nav-right">
+      <div class="search-wrap">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="playerSearch" class="search-input" placeholder="Search player..." oninput="handleSearch(this.value)" autocomplete="off">
+        <div id="searchPopup" class="search-popup"></div>
+      </div>
+    </div>
+  </nav>
+
+  <main class="main-container">
+
+    <div class="kit-bar" id="kitBar">
+      <div class="kit-btn active" data-kit="Overall" onclick="selectKit('Overall')">
+        <span>OVERALL</span>
+      </div>
+      <div class="kit-btn" data-kit="Emerald" onclick="selectKit('Emerald')">
+        <img src="assets/emerald.png" alt="Emerald">
+        <span>EMERALD</span>
+      </div>
+      <div class="kit-btn" data-kit="Emerald KB" onclick="selectKit('Emerald KB')">
+        <img src="assets/emerald_kb.png" alt="Emerald KB">
+        <span>EMERALD KB</span>
+      </div>
+      <div class="kit-btn" data-kit="Dragonhide KB" onclick="selectKit('Dragonhide KB')">
+        <img src="assets/dragonhide_kb.png" alt="Dragonhide KB">
+        <span>DRAGONHIDE KB</span>
+      </div>
+      <div class="kit-btn" data-kit="Manhunt" onclick="selectKit('Manhunt')">
+        <img src="assets/manhunt.png" alt="Manhunt">
+        <span>MANHUNT</span>
+      </div>
+      <div class="kit-btn" data-kit="Diamond" onclick="selectKit('Diamond')">
+        <img src="assets/diamond.png" alt="Diamond">
+        <span>DIAMOND</span>
+      </div>
+      <div class="kit-btn" data-kit="Novelty Axe" onclick="selectKit('Novelty Axe')">
+        <img src="assets/novelty_axe.png" alt="Novelty Axe">
+        <span>NOVELTY AXE</span>
+      </div>
+      <div class="kit-btn" data-kit="Dragonhide Anchor" onclick="selectKit('Dragonhide Anchor')">
+        <img src="assets/dragonhide_anchor.png" alt="Dragonhide Anchor">
+        <span>DRAGONHIDE ANCHOR</span>
+      </div>
+      <div class="kit-btn" data-kit="Void" onclick="selectKit('Void')">
+        <img src="assets/void.png" alt="Void">
+        <span>VOID</span>
+      </div>
+    </div>
+
+    <div class="filter-bar" id="filterBar">
+      <select id="filterRegion" class="filter-select" onchange="applyFilters()">
+        <option value="">All Regions</option>
+        <option value="NA">North America (NA)</option>
+        <option value="EU">Europe (EU)</option>
+        <option value="SA">South America (SA)</option>
+        <option value="AS">Asia (AS)</option>
+        <option value="OC">Oceania (OC)</option>
+        <option value="AF">Africa (AF)</option>
+      </select>
+
+      <select id="filterDevice" class="filter-select" onchange="applyFilters()">
+        <option value="">All Devices</option>
+        <option value="MK">Mouse & Keyboard (MK)</option>
+        <option value="MB">Mobile (MB)</option>
+        <option value="CT">Controller (CT)</option>
+        <option value="TP">Trackpad (TP)</option>
+      </select>
+
+      <select id="filterRetired" class="filter-select" onchange="applyFilters()">
+        <option value="all">All Tiers</option>
+        <option value="active" selected>Active Tiers Only</option>
+        <option value="retired">Retired Tiers Only</option>
+      </select>
+
+      <button class="btn-reset" onclick="resetFilters()">Reset Filters</button>
+    </div>
+
+    <div id="podiumWrap" class="podium-wrap"></div>
+
+    <div id="displayList"></div>
+
+  </main>
+
+  <div id="profileModalOverlay" class="modal-overlay" onclick="closeModalOnBackdrop(event)">
+    <div class="profile-modal" id="profileModal">
+
+      <div class="profile-banner" id="pBanner">
+        <div class="modal-actions">
+          <button class="icon-btn" title="Copy Profile Link" onclick="copyProfileLink()">🔗</button>
+          <button class="icon-btn" title="Embed Profile" onclick="copyEmbedCode()">⚡</button>
+          <button class="icon-btn" title="Close" onclick="closeProfileModal()">✕</button>
+        </div>
+      </div>
+
+      <div class="profile-body">
+
+        <div class="profile-top-row">
+          <div class="avatar-preview-box">
+            <img src="assets/steve.png" alt="Player Avatar" id="pSkinImg" class="avatar-preview-img" onerror="this.src='assets/steve.png'">
+          </div>
+
+          <div class="player-meta-box">
+            <h1 class="player-name-title" id="pName">PlayerName</h1>
+            <div class="player-badges-row" id="pBadgeRow">
+              <span class="badge-pill badge-rank" id="pRank">RANK #1</span>
+              <span class="badge-pill badge-title" id="pTitleBadge">CHAMPION</span>
+              <span class="badge-pill badge-wl" id="pWL">0W / 0L</span>
+            </div>
+          </div>
+
+          <div class="points-counter-box">
+            <div class="points-num" id="pPoints">0</div>
+            <div class="points-lbl">PTS SCORE</div>
+          </div>
+        </div>
+
+        <div class="player-bio-card">
+          <div id="pDescription">No description available.</div>
+          <div class="bio-meta-grid">
+            <div id="pRegion">REGION: --</div>
+            <div id="pDevice">DEVICE: --</div>
+            <div id="pRival">RIVAL: None</div>
+            <div id="pLfm">LFM: OFF</div>
+          </div>
+        </div>
+
+        <div class="modal-section-title">
+          <span>KIT EVALUATIONS & TIERS</span>
+        </div>
+
+        <div class="kit-circles-grid" id="pTiers"></div>
+
+      </div>
+    </div>
+  </div>
+
+  <div class="music-player-widget" id="musicPlayerWidget">
+    <div class="music-info">
+      <div class="music-eq-bars" id="musicEq">
+        <span></span><span></span><span></span><span></span>
+      </div>
+      <div class="music-text">
+        <div class="music-title">NOW PLAYING</div>
+        <div class="music-artist" id="musicTrackName">MTC Tiers Theme</div>
+      </div>
+    </div>
+    
+    <div class="music-controls">
+      <button class="music-btn" id="musicPlayBtn" onclick="toggleMusicPlay()">▶</button>
+      <input type="range" id="musicSeek" class="music-seek" value="0" min="0" max="100" oninput="seekMusic(this.value)">
+      <span class="music-time" id="musicTime">0:00</span>
+      <div class="music-volume-box">
+        <button class="music-vol-btn" id="musicVolBtn" onclick="toggleMuteMusic()" title="Mute/Unmute">🔊</button>
+        <input type="range" id="musicVolume" class="music-vol-slider" value="50" min="0" max="100" oninput="setMusicVolume(this.value)" title="Volume">
+      </div>
+    </div>
+  </div>
+
+  <!-- Duel Details Modal -->
+  <div id="duelPopupModal" class="modal-overlay" onclick="closeDuelPopup()">
+    <div class="profile-modal" style="max-width: 480px; padding: 28px;" onclick="event.stopPropagation()">
+      <div class="modal-actions">
+        <button class="icon-btn" onclick="closeDuelPopup()">✕</button>
+      </div>
+      <div id="duelPopupContent"></div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast">Link copied to clipboard!</div>
+
+  <script src="app.js"></script>
+
+</body>
+</html>

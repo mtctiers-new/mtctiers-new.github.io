@@ -1,0 +1,23 @@
+{
+  "rules": {
+    "rankings": {
+      ".read": true,
+      ".write": "auth != null && auth.token.admin === true"
+    },
+    "hof": {
+      ".read": true,
+      ".write": "auth != null && auth.token.admin === true"
+    },
+    "testers": {
+      ".read": true,
+      ".write": "auth != null && auth.token.admin === true"
+    },
+    "users": {
+      ".read": true,
+      "$uid": {
+        ".write": "auth != null && (auth.uid === $uid || auth.token.admin === true)",
+        ".validate": "newData.hasChildren(['name'])"
+      }
+    }
+  }
+}

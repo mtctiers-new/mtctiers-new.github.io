@@ -1,0 +1,51 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions for security checks
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && (request.auth.token.admin == true || request.auth.token.role == "admin");
+    }
+
+    // Rankings & Tier Lists (Public Read, Admin Write)
+    match /rankings/{document=**} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Hall of Fame & Testers (Public Read, Admin Write)
+    match /hof/{document=**} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+    
+    match /testers/{document=**} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // User Profiles Collection
+    match /users/{userId} {
+      allow read: if true;
+      allow create, update: if isOwner(userId) && isValidUserProfile();
+      allow delete: if isAdmin();
+    }
+
+    // Validate User Profile Structure
+    function isValidUserProfile() {
+      let data = request.resource.data;
+      return data.name is string && data.name.size() > 0 && data.name.size() <= 32
+        && (data.description == null || (data.description is string && data.description.size() <= 280))
+        && (data.region == null || (data.region is string && data.region.size() <= 10))
+        && (data.device == null || (data.device is string && data.device.size() <= 10));
+    }
+  }
+}
