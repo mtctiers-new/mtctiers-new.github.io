@@ -2123,4 +2123,26 @@ body {
   color: #fff;
 }
 
+.auth-btn {
+  padding: 12px 24px;
+  background: linear-gradient(135deg, var(--cyan) 0%, #0099ff 100%);
+  color: #000;
+  font-family: var(--font-heading);
+  font-weight: 900;
+  font-size: 0.85rem;
+  letter-spacing: 1px;
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  box-shadow: 0 0 20px rgba(0, 238, 255, 0.4);
+  transition: all 0.25s ease;
+  user-select: none;
+}
+
+.auth-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 0 30px rgba(0, 238, 255, 0.7);
+  background: linear-gradient(135deg, #33f0ff 0%, #1ab0ff 100%);
+}
+
 
