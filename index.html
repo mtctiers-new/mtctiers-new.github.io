@@ -402,34 +402,6 @@
     </div>
   </div>
 
-  <!-- Staff Login Modal -->
-  <div id="staffLoginModalOverlay" class="modal-overlay" onclick="closeStaffLoginModalOnBackdrop(event)">
-    <div class="submit-duel-card" style="max-width:420px;text-align:center;" onclick="event.stopPropagation()">
-      <div class="modal-close-btn" onclick="closeStaffLoginModal()">✕</div>
-      <img src="assets/mtctiers.png" alt="Logo" style="width:60px;height:60px;margin-bottom:12px;filter:drop-shadow(0 0 10px rgba(0,238,255,0.4));">
-      <h2 class="modal-title">🔑 STAFF & ADMIN LOGIN</h2>
-      <p class="modal-subtitle">Log in with your Whitelisted Email, Username, or Staff Password</p>
-
-      <div class="duel-form-group" style="text-align:left;margin-top:15px;">
-        <label>Whitelisted Email / Username / Staff Password</label>
-        <input type="text" id="loginAccountInput" class="form-input" placeholder="e.g. ziadn6b@gmail.com or ziadn6b" onkeyup="if(event.key==='Enter') submitStaffLogin()">
-      </div>
-
-      <button onclick="submitStaffLogin()" class="auth-btn" style="margin-top:10px;width:100%;">LOGIN TO PORTAL</button>
-
-      <div style="margin:16px 0;display:flex;align-items:center;gap:10px;color:var(--text-dim);font-size:0.8rem;">
-        <div style="flex:1;height:1px;background:var(--border-glass);"></div>
-        <span>OR</span>
-        <div style="flex:1;height:1px;background:var(--border-glass);"></div>
-      </div>
-
-      <button onclick="tryGoogleLoginAuth()" class="btn-login" style="width:100%;justify-content:center;padding:12px;box-sizing:border-box;">
-        <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" style="width:18px;height:18px;margin-right:8px;vertical-align:middle;">
-        <span>SIGN IN WITH GOOGLE</span>
-      </button>
-    </div>
-  </div>
-
   <div id="toast" class="toast">Link copied to clipboard!</div>
 
   <script src="app.js"></script>

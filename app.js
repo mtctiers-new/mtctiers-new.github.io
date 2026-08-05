@@ -64,31 +64,19 @@ try {
   console.warn("Firebase init note:", e.message);
 }
 
-// Local session storage check on page load
-document.addEventListener('DOMContentLoaded', () => {
-  const savedStaff = localStorage.getItem('mtc_staff_auth');
-  if (savedStaff) {
-    setStaffAdminLoggedIn(savedStaff);
-  }
-});
+let WHITELIST_HASHES = [
+  'd4a5b883a89d3c535ffb6bced51d56033b4d410fdd3fde242fae780bac7a4602', // ziadn6b@gmail.com
+  'de120db9844ffefef088609b949a32573699e2ab85ecbeb1482657ff5686632e', // v4n1shedytoffical@gmail.com
+  '261fe193200c0fba9f3c617e42f29dbcbe3dd2cecb63360b006af80be82f4203', // admin@mtctiers.com
+  'c45acd2b689ad993d32b110f6d55c0509d1b7f656ffe3afce0f490e35067addd', // mtctiers@gmail.com
+  '84fc42c02f3d15b767b048a150696fb0839904cbfb0a55e8133f022cce839dc2', // cicweb@gmail.com
+  'dbf7aa42a46b67af93a95d75332ec048b0cf448eaf2344d65b2a4ebb607a8f0d'  // game1k@mtctiers.com
+];
 
-function setStaffAdminLoggedIn(nameOrEmail) {
-  IS_ADMIN = true;
-  localStorage.setItem('mtc_staff_auth', nameOrEmail);
-
-  const loginBtn = document.getElementById('loginBtn');
-  const userProfile = document.getElementById('userProfile');
-  const userAvatar = document.getElementById('userAvatar');
-  const userName = document.getElementById('userName');
-  const adminTag = document.getElementById('adminTag');
-  const adminDuelBtn = document.getElementById('adminDuelBtn');
-
-  if (loginBtn) loginBtn.style.display = 'none';
-  if (userProfile) userProfile.style.display = 'flex';
-  if (userAvatar) userAvatar.src = getPlayerSkinSrc(nameOrEmail) || 'assets/mtctiers_default_skin.png';
-  if (userName) userName.innerText = nameOrEmail.toUpperCase();
-  if (adminTag) adminTag.style.display = 'inline-block';
-  if (adminDuelBtn) adminDuelBtn.style.display = 'inline-flex';
+async function sha256Hex(str) {
+  const buf = new TextEncoder().encode(str.toLowerCase().trim());
+  const hashBuf = await crypto.subtle.digest('SHA-256', buf);
+  return Array.from(new Uint8Array(hashBuf)).map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
 const EMAIL_TO_PLAYER = {
@@ -97,19 +85,22 @@ const EMAIL_TO_PLAYER = {
 };
 
 async function checkWhitelistStatus(email) {
-  if (!email) return;
-  const cleanEmail = email.toLowerCase().trim();
-  IS_ADMIN = WHITELIST_EMAILS.map(e => e.toLowerCase()).includes(cleanEmail) || ['ziadn6b@gmail.com', 'v4n1shedytoffical@gmail.com', 'ziadn6b'].includes(cleanEmail);
+  if (!email) {
+    IS_ADMIN = false;
+    return;
+  }
+  const emailHash = await sha256Hex(email);
+  IS_ADMIN = WHITELIST_HASHES.includes(emailHash);
 
   try {
     const fsRes = await fetch("https://firestore.googleapis.com/v1/projects/mtctiers/databases/(default)/documents/rankings/whitelist");
     if (fsRes.ok) {
       const doc = await fsRes.json();
-      const rawEmails = doc.fields?.emails?.arrayValue?.values || [];
-      const remoteList = rawEmails.map(v => (v.stringValue || '').toLowerCase().trim()).filter(Boolean);
+      const rawHashes = doc.fields?.hashes?.arrayValue?.values || [];
+      const remoteList = rawHashes.map(v => v.stringValue).filter(Boolean);
       if (remoteList.length) {
-        WHITELIST_EMAILS = remoteList;
-        IS_ADMIN = WHITELIST_EMAILS.includes(cleanEmail) || ['ziadn6b@gmail.com', 'v4n1shedytoffical@gmail.com', 'ziadn6b'].includes(cleanEmail);
+        WHITELIST_HASHES = remoteList;
+        IS_ADMIN = WHITELIST_HASHES.includes(emailHash);
       }
     }
   } catch (e) {
@@ -117,49 +108,38 @@ async function checkWhitelistStatus(email) {
   }
 }
 
-function loginWithGoogle() {
-  document.getElementById('staffLoginModalOverlay').classList.add('active');
-}
-
-function closeStaffLoginModal() {
-  document.getElementById('staffLoginModalOverlay').classList.remove('active');
-}
-
-function closeStaffLoginModalOnBackdrop(e) {
-  if (e.target.id === 'staffLoginModalOverlay') {
-    closeStaffLoginModal();
-  }
-}
-
-async function submitStaffLogin() {
-  const input = document.getElementById('loginAccountInput');
-  const val = input.value.trim().toLowerCase();
-  if (!val) return alert("Please enter your Whitelisted Email, Username, or Staff Password.");
-
-  const isWhitelisted = ['ziadn6b@gmail.com', 'v4n1shedytoffical@gmail.com', 'ziadn6b', 'ziadlive', 'vorthexis', 'mtcstaff2026'].includes(val) || WHITELIST_EMAILS.map(e => e.toLowerCase()).includes(val);
-
-  if (isWhitelisted) {
-    const finalName = (val === 'mtcstaff2026' || val === 'ziadn6b' || val === 'ziadlive') ? 'ziadn6b@gmail.com' : (val === 'vorthexis' ? 'v4n1shedytoffical@gmail.com' : val);
-    setStaffAdminLoggedIn(finalName);
-    closeStaffLoginModal();
-    showToast(`✅ Welcome Staff Admin ${finalName}!`);
-  } else {
-    alert("❌ Access Denied: Account or Password is not in Whitelist.");
-  }
-}
-
-async function tryGoogleLoginAuth() {
+async function loginWithGoogle() {
   if (!auth) return alert("Firebase Auth SDK not initialized.");
   try {
     const provider = new firebase.auth.GoogleAuthProvider();
     provider.setCustomParameters({ prompt: 'select_account' });
     await auth.signInWithPopup(provider);
-    closeStaffLoginModal();
-    showToast("✅ Signed in with Google!");
+    showToast("✅ Authenticated via Google Auth!");
   } catch (e) {
-    console.warn("Google Auth popup note:", e.code || e.message);
-    alert("Google Sign-In Note: " + (e.message || "Failed to open popup. Please use Whitelisted Email or Staff Password above."));
+    console.error("Google Auth error:", e.message);
+    alert("Google Sign-In Error: " + (e.message || "Failed to authenticate with Google."));
   }
+}
+
+async function logoutUser() {
+  IS_ADMIN = false;
+  CURRENT_USER = null;
+  if (auth) {
+    try { await auth.signOut(); } catch (e) {}
+  }
+  const loginBtn = document.getElementById('loginBtn');
+  const userProfile = document.getElementById('userProfile');
+  const adminTag = document.getElementById('adminTag');
+  const adminDuelBtn = document.getElementById('adminDuelBtn');
+  const adminDashBtn = document.getElementById('adminDashBtn');
+
+  if (loginBtn) loginBtn.style.display = 'inline-flex';
+  if (userProfile) userProfile.style.display = 'none';
+  if (adminTag) adminTag.style.display = 'none';
+  if (adminDuelBtn) adminDuelBtn.style.display = 'none';
+  if (adminDashBtn) adminDashBtn.style.display = 'none';
+
+  showToast("Logged out");
 }
 
 async function logoutUser() {
@@ -1376,15 +1356,15 @@ function renderWhitelistItems() {
   const container = document.getElementById('whitelistItemsList');
   if (!container) return;
 
-  if (!WHITELIST_EMAILS || !WHITELIST_EMAILS.length) {
-    container.innerHTML = `<div style="color:var(--text-muted);font-size:0.85rem;">No whitelisted accounts</div>`;
+  if (!WHITELIST_HASHES || !WHITELIST_HASHES.length) {
+    container.innerHTML = `<div style="color:var(--text-muted);font-size:0.85rem;">No whitelisted hashes</div>`;
     return;
   }
 
-  container.innerHTML = WHITELIST_EMAILS.map(email => `
+  container.innerHTML = WHITELIST_HASHES.map(hash => `
     <div class="whitelist-item-row">
-      <span>${email}</span>
-      <button onclick="removeEmailFromWhitelist('${email}')" class="whitelist-remove-btn">Remove</button>
+      <span style="font-family:var(--font-mono);font-size:0.75rem;">SHA256: ${hash.slice(0, 16)}...${hash.slice(-8)}</span>
+      <button onclick="removeEmailFromWhitelist('${hash}')" class="whitelist-remove-btn">Remove</button>
     </div>
   `).join('');
 }
@@ -1394,32 +1374,34 @@ async function addEmailToWhitelist() {
   const val = input.value.trim().toLowerCase();
   if (!val) return alert("Please enter an email or username");
 
-  if (WHITELIST_EMAILS.includes(val)) {
-    return alert("Account already whitelisted!");
+  const newHash = await sha256Hex(val);
+
+  if (WHITELIST_HASHES.includes(newHash)) {
+    return alert("Account hash already in Whitelist!");
   }
 
-  WHITELIST_EMAILS.push(val);
+  WHITELIST_HASHES.push(newHash);
   input.value = '';
   renderWhitelistItems();
 
   try {
     if (db) {
-      await db.collection('rankings').doc('whitelist').set({ emails: WHITELIST_EMAILS });
-      showToast(`Added ${val} to Whitelist!`);
+      await db.collection('rankings').doc('whitelist').set({ hashes: WHITELIST_HASHES });
+      showToast(`Added SHA-256 hash to Whitelist!`);
     }
   } catch (e) {
     alert("Failed to update whitelist: " + e.message);
   }
 }
 
-async function removeEmailFromWhitelist(email) {
-  WHITELIST_EMAILS = WHITELIST_EMAILS.filter(e => e.toLowerCase() !== email.toLowerCase());
+async function removeEmailFromWhitelist(targetHash) {
+  WHITELIST_HASHES = WHITELIST_HASHES.filter(h => h !== targetHash);
   renderWhitelistItems();
 
   try {
     if (db) {
-      await db.collection('rankings').doc('whitelist').set({ emails: WHITELIST_EMAILS });
-      showToast(`Removed ${email} from Whitelist`);
+      await db.collection('rankings').doc('whitelist').set({ hashes: WHITELIST_HASHES });
+      showToast(`Removed hash from Whitelist`);
     }
   } catch (e) {
     alert("Failed to update whitelist: " + e.message);
