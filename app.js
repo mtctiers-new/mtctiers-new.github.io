@@ -116,7 +116,11 @@ async function checkWhitelistStatus(email) {
     console.warn("Whitelist fetch note:", e.message);
   }
 
-  const matched = WHITELIST_ENTRIES.find(e => e.hash === emailHash);
+  const matched = WHITELIST_ENTRIES.find(e => 
+    e.hash === emailHash || 
+    (e.email && e.email.toLowerCase().trim() === cleanEmail) ||
+    (e.label && e.label.toLowerCase().trim() === cleanEmail)
+  );
 
   if (matched) {
     CURRENT_ROLE = matched.role || 'player';
@@ -957,7 +961,9 @@ async function openProfile(name) {
                   assignedP === '*' || 
                   assignedP === targetP || 
                   (EMAIL_TO_PLAYER[userEmail] || '').toLowerCase() === targetP || 
-                  userEmail === targetP;
+                  userEmail === targetP ||
+                  (CURRENT_USER?.displayName || '').toLowerCase().trim() === targetP ||
+                  (CURRENT_USER?.displayName || '').toLowerCase().trim().includes(targetP);
 
   if (pEditBtn) {
     pEditBtn.style.display = canEdit ? 'inline-flex' : 'none';
