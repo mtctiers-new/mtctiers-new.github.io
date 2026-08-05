@@ -116,7 +116,7 @@ async function checkWhitelistStatus(email) {
     console.warn("Whitelist fetch note:", e.message);
   }
 
-  const matched = WHITELIST_ENTRIES.find(e => e.hash === emailHash || (e.label && e.label.toLowerCase().includes(cleanEmail)));
+  const matched = WHITELIST_ENTRIES.find(e => e.hash === emailHash);
 
   if (matched) {
     CURRENT_ROLE = matched.role || 'player';

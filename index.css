@@ -2051,22 +2051,49 @@ body {
 }
 
 .btn-admin-dash {
-  padding: 8px 14px;
-  background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
-  color: #fff;
+  padding: 8px 16px;
+  background: rgba(59, 130, 246, 0.12);
+  border: 1px solid rgba(59, 130, 246, 0.35);
+  color: #93c5fd;
   font-family: var(--font-heading);
-  font-weight: 800;
+  font-weight: 700;
   font-size: 0.8rem;
-  border: none;
-  border-radius: 8px;
+  letter-spacing: 0.5px;
+  border-radius: 20px;
   cursor: pointer;
-  box-shadow: 0 0 15px rgba(59, 130, 246, 0.4);
-  transition: all 0.25s ease;
-  margin-right: 8px;
+  box-shadow: 0 0 12px rgba(59, 130, 246, 0.15);
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  white-space: nowrap;
 }
 .btn-admin-dash:hover {
+  background: rgba(59, 130, 246, 0.25);
+  border-color: #60a5fa;
+  color: #fff;
   transform: translateY(-2px);
-  box-shadow: 0 0 25px rgba(59, 130, 246, 0.7);
+  box-shadow: 0 0 20px rgba(59, 130, 246, 0.4);
+}
+
+.btn-admin-duel {
+  padding: 8px 18px;
+  background: rgba(168, 85, 247, 0.15);
+  border: 1px solid rgba(168, 85, 247, 0.4);
+  color: #e9d5ff;
+  font-family: var(--font-heading);
+  font-weight: 800;
+  font-size: 0.82rem;
+  letter-spacing: 0.5px;
+  border-radius: 20px;
+  cursor: pointer;
+  box-shadow: 0 0 15px rgba(168, 85, 247, 0.2);
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  white-space: nowrap;
+}
+.btn-admin-duel:hover {
+  background: rgba(168, 85, 247, 0.3);
+  border-color: #c084fc;
+  color: #fff;
+  transform: translateY(-2px);
+  box-shadow: 0 0 25px rgba(168, 85, 247, 0.45);
 }
 
 .whitelist-item-row {
