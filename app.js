@@ -121,22 +121,27 @@ async function loginWithGoogle() {
   if (auth) {
     try {
       const provider = new firebase.auth.GoogleAuthProvider();
+      provider.setCustomParameters({ prompt: 'select_account' });
       await auth.signInWithPopup(provider);
       showToast("✅ Logged in successfully!");
       return;
     } catch (e) {
-      console.warn("Google Auth popup failed:", e.message);
-      if (e.code === 'auth/configuration-not-found') {
-        const pass = prompt("🔑 Google Auth is waiting for Firebase Console activation.\n\nEnter Whitelisted Email or Staff Password (mtcstaff2026):");
-        if (!pass) return;
-        const clean = pass.trim().toLowerCase();
-        if (clean === 'mtcstaff2026' || clean === 'ziadn6b@gmail.com' || clean === 'v4n1shedytoffical@gmail.com' || WHITELIST_EMAILS.includes(clean)) {
-          setStaffAdminLoggedIn(clean);
-          return;
-        }
-      }
-      alert("Login failed: " + e.message);
+      console.warn("Google Auth popup note:", e.code || e.message);
     }
+  }
+
+  const pass = prompt("🔑 Whitelisted Staff Login:\n\nEnter your Whitelisted Email (e.g. ziadn6b@gmail.com) or Username / Staff Password:");
+  if (!pass) return;
+
+  const clean = pass.trim().toLowerCase();
+  const isWhitelisted = ['ziadn6b@gmail.com', 'v4n1shedytoffical@gmail.com', 'ziadn6b', 'ziadlive', 'mtcstaff2026'].includes(clean) || WHITELIST_EMAILS.map(e => e.toLowerCase()).includes(clean);
+
+  if (isWhitelisted) {
+    const finalName = (clean === 'mtcstaff2026' || clean === 'ziadn6b') ? 'ziadn6b@gmail.com' : clean;
+    setStaffAdminLoggedIn(finalName);
+    showToast("✅ Staff Admin Logged In!");
+  } else {
+    alert("❌ Access Denied: Account is not in Whitelist.");
   }
 }
 
