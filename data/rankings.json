@@ -82,21 +82,384 @@
   },
   "Players": [
     {
-      "device": "MK",
+      "name": "x9jm",
+      "region": "NA",
+      "device": "MK"
+    },
+    {
+      "name": "system1117",
+      "region": "NA",
+      "device": "MK"
+    },
+    {
+      "name": "Vorthexis",
+      "region": "NA",
+      "device": "MK"
+    },
+    {
+      "name": "Possessed_YT",
+      "region": "NA",
+      "device": "MK"
+    },
+    {
+      "name": "TimmyLoal",
       "region": "OC",
-      "name": "TimmyLoal"
+      "device": "MK"
     },
     {
-      "device": "MK",
-      "skinUrl": "https://media.discordapp.net/attachments/1534311514054594681/1534318670572949504/Screenshot_2026-08-04_at_11.53.23_AM.png?ex=6a73b11d&is=6a725f9d&hm=bc553ac2dd01935231cf36e26971d70ac2aadeebae6a91ea0f279010e980165f&=&format=webp&quality=lossless",
-      "name": "_Mario34_",
-      "region": "EU"
+      "name": "skibidi1234",
+      "region": "AS",
+      "device": "MK"
     },
     {
-      "skinUrl": "https://cdn.discordapp.com/ephemeral-attachments/1534308955642265715/1534330139171881050/1000005982.png?ex=6a73bbcb&is=6a726a4b&hm=93d9074a5851342406cd2b2990fd3ae17efa78e51ca20e529b766f3e2b074ac4&",
-      "device": "MK",
+      "name": "DivyamGamerYT",
+      "region": "AS",
+      "device": "MK"
+    },
+    {
+      "name": "revan",
+      "region": "NA",
+      "device": "TP"
+    },
+    {
+      "name": "ItzNoob_",
+      "region": "AS",
+      "device": "MK"
+    },
+    {
+      "name": "FarXD",
+      "region": "AS",
+      "device": "MB"
+    },
+    {
+      "name": "drago",
+      "region": "AS",
+      "device": "MK"
+    },
+    {
+      "name": "Kirby",
+      "region": "AS",
+      "device": "MK"
+    },
+    {
+      "name": "NetworkHero",
       "region": "EU",
-      "name": "LastChance"
+      "device": "MK"
+    },
+    {
+      "name": "LifoMC",
+      "region": "AF",
+      "device": "MK"
+    },
+    {
+      "name": "AntonioZga9",
+      "region": "NA",
+      "device": "MB"
+    },
+    {
+      "name": "MGK",
+      "region": "AS",
+      "device": "MB"
+    },
+    {
+      "name": "ArpanYT",
+      "region": "AS",
+      "device": "MB"
+    },
+    {
+      "name": "MatrixOP980",
+      "region": "AS",
+      "device": "MB"
+    },
+    {
+      "name": "SaintOfZytrox",
+      "region": "AS",
+      "device": "MB"
+    },
+    {
+      "name": "f0rg1v3n",
+      "region": "AS",
+      "device": "MK"
+    },
+    {
+      "name": "Afdemonking",
+      "region": "EU",
+      "device": "MB"
+    },
+    {
+      "name": "CosmicallyXVII",
+      "region": "EU",
+      "device": "MK"
+    },
+    {
+      "name": "M0rt7uxMC",
+      "region": "AS",
+      "device": "MK"
+    },
+    {
+      "name": "Mane",
+      "region": "EU",
+      "device": "MB"
+    },
+    {
+      "name": "Jerryisking",
+      "region": "AS",
+      "device": "MK"
+    },
+    {
+      "name": "chi-na",
+      "region": "EU",
+      "device": "MK"
+    },
+    {
+      "name": "CJSHORT",
+      "region": "EU",
+      "device": "MK"
+    },
+    {
+      "name": "Husky_Multicraft",
+      "region": "NA",
+      "device": "MK"
+    },
+    {
+      "name": "RayValidd",
+      "region": "AS",
+      "device": "MK"
+    },
+    {
+      "name": "-_ItsEthanLIT_-",
+      "region": "SA",
+      "device": "CT"
+    },
+    {
+      "name": "Jetbunz99",
+      "region": "AS",
+      "device": "MB"
+    },
+    {
+      "name": "Oden_Sama",
+      "region": "Unknown",
+      "device": "MB"
+    },
+    {
+      "name": "xenoXD",
+      "region": "AS",
+      "device": "MB"
+    },
+    {
+      "name": "MrDaRkYT",
+      "region": "AS",
+      "device": "MK"
+    },
+    {
+      "name": "Herobrine",
+      "region": "NA",
+      "device": "MK"
+    },
+    {
+      "name": "LastChance",
+      "region": "NA",
+      "device": "MK"
+    },
+    {
+      "name": "Solace",
+      "region": "AS",
+      "device": "MK"
+    },
+    {
+      "name": "-R3ZN-",
+      "region": "NA",
+      "device": "MB"
+    },
+    {
+      "name": "SJ_GHOST",
+      "region": "NA",
+      "device": "MK"
+    },
+    {
+      "name": "Luther",
+      "region": "NA",
+      "device": "MB"
+    },
+    {
+      "name": "vort3x",
+      "region": "EU",
+      "device": "MK"
+    },
+    {
+      "name": "Dream_MultiCraft",
+      "region": "AS",
+      "device": "MK"
+    },
+    {
+      "name": "shadow_master",
+      "region": "NA",
+      "device": "CT"
+    },
+    {
+      "name": "bluedigit",
+      "region": "SA",
+      "device": "MB"
+    },
+    {
+      "name": "Ayush_maan234",
+      "region": "AS",
+      "device": "MK"
+    },
+    {
+      "name": "Corpse",
+      "region": "NA",
+      "device": "CT"
+    },
+    {
+      "name": "Kaeye",
+      "region": "NA",
+      "device": "MB"
+    },
+    {
+      "name": "Game1K",
+      "region": "NA",
+      "device": "MK"
+    },
+    {
+      "name": "SHADE",
+      "region": "AS",
+      "device": "MK"
+    },
+    {
+      "name": "Terminator",
+      "region": "AS",
+      "device": "MK"
+    },
+    {
+      "name": "Duality",
+      "region": "AS",
+      "device": "MB"
+    },
+    {
+      "name": "Superboy",
+      "region": "AF",
+      "device": "MB"
+    },
+    {
+      "name": "jogg",
+      "region": "NA",
+      "device": "CT"
+    },
+    {
+      "name": "Atomix",
+      "region": "NA",
+      "device": "MB"
+    },
+    {
+      "name": "Ron_",
+      "region": "Unknown",
+      "device": "MK"
+    },
+    {
+      "name": "Normal",
+      "region": "EU",
+      "device": "MK"
+    },
+    {
+      "name": "TERRORRR",
+      "region": "AS",
+      "device": "MK"
+    },
+    {
+      "name": "MTCTIERS",
+      "region": "MTCTIERS",
+      "device": "MTCTIERS"
+    },
+    {
+      "name": "Redistdrext",
+      "region": "AS",
+      "device": "MK"
+    },
+    {
+      "name": "MENDOR",
+      "region": "AF",
+      "device": "MK"
+    },
+    {
+      "name": "ziadlive",
+      "region": "AF",
+      "device": "MK"
+    },
+    {
+      "name": "Fortress",
+      "region": "Unknown",
+      "device": "Unknown"
+    },
+    {
+      "name": "ghost123",
+      "region": "AS",
+      "device": "MB"
+    },
+    {
+      "name": "sample",
+      "region": "AS",
+      "device": "TP"
+    },
+    {
+      "name": "-_Hades_-",
+      "region": "NA",
+      "device": "MK"
+    },
+    {
+      "name": "Ashar",
+      "region": "AS",
+      "device": "MK"
+    },
+    {
+      "name": "spareman2",
+      "region": "AS",
+      "device": "MB"
+    },
+    {
+      "name": "_Mario34_",
+      "region": "NA",
+      "device": "MK"
+    },
+    {
+      "name": "ChillPotato",
+      "region": "SA",
+      "device": "MK"
+    },
+    {
+      "name": "Charm_Of_Luck",
+      "region": "NA",
+      "device": "MK"
+    },
+    {
+      "name": "Space2k",
+      "region": "NA",
+      "device": "MK"
+    },
+    {
+      "name": "MrLivingstone",
+      "region": "AS",
+      "device": "MB"
+    },
+    {
+      "name": "Verlin",
+      "region": "NA",
+      "device": "MB"
+    },
+    {
+      "name": "<<< . ., > .,/",
+      "region": "Unknown",
+      "device": ",.,/ , <<"
+    },
+    {
+      "name": "PVP_PC_KAMIL69",
+      "region": "EU",
+      "device": "MK"
+    },
+    {
+      "name": "-_Joker_-",
+      "region": "NA",
+      "device": "MB"
     }
   ],
   "Diamond": {

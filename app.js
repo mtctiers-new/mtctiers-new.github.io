@@ -241,6 +241,19 @@ function getPlayerMeta(name) {
   return (DATA.Players || []).find(p => (typeof p === 'object' ? p.name : p).toLowerCase().trim() === clean) || {};
 }
 
+function parseFirestoreMap(fields) {
+  if (!fields) return {};
+  const obj = {};
+  for (let k in fields) {
+    const valObj = fields[k];
+    if (valObj.stringValue !== undefined) obj[k] = valObj.stringValue;
+    else if (valObj.booleanValue !== undefined) obj[k] = valObj.booleanValue;
+    else if (valObj.integerValue !== undefined) obj[k] = parseInt(valObj.integerValue, 10);
+    else if (valObj.doubleValue !== undefined) obj[k] = parseFloat(valObj.doubleValue);
+  }
+  return obj;
+}
+
 async function loadRankingsData() {
   try {
     const res = await fetch(`data/rankings.json?v=${Date.now()}`);
@@ -252,7 +265,22 @@ async function loadRankingsData() {
         const fsDoc = await fsRes.json();
         const rawPlayers = fsDoc.fields?.players?.arrayValue?.values || [];
         if (rawPlayers.length) {
-          DATA.Players = rawPlayers.map(item => parseFirestoreMap(item.mapValue?.fields || {}));
+          const remotePlayers = rawPlayers.map(item => parseFirestoreMap(item.mapValue?.fields || {}));
+          
+          // Merge local & remote players safely
+          const playerMap = new Map();
+          (DATA.Players || []).forEach(p => {
+            const name = typeof p === 'object' ? p.name : p;
+            if (name) playerMap.set(name.toLowerCase(), typeof p === 'object' ? p : { name });
+          });
+          remotePlayers.forEach(p => {
+            if (p && p.name) {
+              const key = p.name.toLowerCase();
+              const existing = playerMap.get(key) || {};
+              playerMap.set(key, { ...existing, ...p });
+            }
+          });
+          DATA.Players = Array.from(playerMap.values());
         }
       }
     } catch (e) {
