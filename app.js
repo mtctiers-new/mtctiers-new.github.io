@@ -1380,21 +1380,37 @@ function closeAdminDashModalOnBackdrop(e) {
   }
 }
 
+const KNOWN_HASH_LABELS = {
+  'd4a5b883a89d3c535ffb6bced51d56033b4d410fdd3fde242fae780bac7a4602': 'ziadn6b@gmail.com (Owner)',
+  'de120db9844ffefef088609b949a32573699e2ab85ecbeb1482657ff5686632e': 'v4n1shedytoffical@gmail.com (Admin)',
+  'c0e9b169d9f8e920cdc57277caccbaa160e1e2b7d886952bb027b51330f5bb16': 'v41nshedytoffical@gmail.com (Admin)',
+  '3eef6721a50faedfaaefa7c075faa4fb604f6b59dbed9b147ac953051934b452': 'vorthexis (Admin)',
+  'b3339600b6cca216725b00048b34f873035b7e3c9d2f100ba33828adc045fa6f': 'v41nshed (Admin)',
+  '45fa8d30db1adfac35b83544615eb76462ea55c0ed65069d7b584ad72b42d165': 'v4n1shed (Admin)',
+  '261fe193200c0fba9f3c617e42f29dbcbe3dd2cecb63360b006af80be82f4203': 'admin@mtctiers.com',
+  'c45acd2b689ad993d32b110f6d55c0509d1b7f656ffe3afce0f490e35067addd': 'mtctiers@gmail.com',
+  '84fc42c02f3d15b767b048a150696fb0839904cbfb0a55e8133f022cce839dc2': 'cicweb@gmail.com',
+  'dbf7aa42a46b67af93a95d75332ec048b0cf448eaf2344d65b2a4ebb607a8f0d': 'game1k@mtctiers.com'
+};
+
 function renderWhitelistItems() {
   const container = document.getElementById('whitelistItemsList');
   if (!container) return;
 
   if (!WHITELIST_HASHES || !WHITELIST_HASHES.length) {
-    container.innerHTML = `<div style="color:var(--text-muted);font-size:0.85rem;">No whitelisted hashes</div>`;
+    container.innerHTML = `<div style="color:var(--text-muted);font-size:0.85rem;">No whitelisted accounts</div>`;
     return;
   }
 
-  container.innerHTML = WHITELIST_HASHES.map(hash => `
-    <div class="whitelist-item-row">
-      <span style="font-family:var(--font-mono);font-size:0.75rem;">SHA256: ${hash.slice(0, 16)}...${hash.slice(-8)}</span>
-      <button onclick="removeEmailFromWhitelist('${hash}')" class="whitelist-remove-btn">Remove</button>
-    </div>
-  `).join('');
+  container.innerHTML = WHITELIST_HASHES.map(hash => {
+    const label = KNOWN_HASH_LABELS[hash] || `Account (${hash.slice(0, 8)}...${hash.slice(-4)})`;
+    return `
+      <div class="whitelist-item-row">
+        <span style="font-family:var(--font-heading);font-size:0.85rem;font-weight:700;color:#fff;">${label}</span>
+        <button onclick="removeEmailFromWhitelist('${hash}')" class="whitelist-remove-btn">Remove</button>
+      </div>
+    `;
+  }).join('');
 }
 
 async function addEmailToWhitelist() {
