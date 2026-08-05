@@ -182,7 +182,7 @@ async function handleAdminCommand(interaction) {
         if (kit === 'Overall' || kit === 'Players') continue;
         for (const tier in rankings[kit]) {
           if (Array.isArray(rankings[kit][tier])) {
-            rankings[kit][tier] = rankings[kit][tier].filter(p => p.toLowerCase() !== username.toLowerCase());
+            rankings[kit][tier] = rankings[kit][tier].filter(p => (typeof p === 'object' ? p.name : p || '').toString().toLowerCase() !== username.toLowerCase());
           }
         }
       }
@@ -329,7 +329,7 @@ async function handleAdminCommand(interaction) {
 
       for (const t in rankings[kit]) {
         if (Array.isArray(rankings[kit][t])) {
-          rankings[kit][t] = rankings[kit][t].filter(p => p.toLowerCase() !== player.toLowerCase());
+          rankings[kit][t] = rankings[kit][t].filter(p => (typeof p === 'object' ? p.name : p || '').toString().toLowerCase() !== player.toLowerCase());
         }
       }
 
@@ -352,7 +352,7 @@ async function handleAdminCommand(interaction) {
       if (rankings[kit]) {
         for (const t in rankings[kit]) {
           if (Array.isArray(rankings[kit][t])) {
-            rankings[kit][t] = rankings[kit][t].filter(p => p.toLowerCase() !== player.toLowerCase());
+            rankings[kit][t] = rankings[kit][t].filter(p => (typeof p === 'object' ? p.name : p || '').toString().toLowerCase() !== player.toLowerCase());
           }
         }
       }
@@ -399,7 +399,7 @@ async function handleAdminCommand(interaction) {
         if (kit === 'Overall' || kit === 'Players') continue;
         for (const tier in rankings[kit]) {
           if (Array.isArray(rankings[kit][tier])) {
-            rankings[kit][tier] = rankings[kit][tier].filter(p => p.toLowerCase() !== player.toLowerCase());
+            rankings[kit][tier] = rankings[kit][tier].filter(p => (typeof p === 'object' ? p.name : p || '').toString().toLowerCase() !== player.toLowerCase());
           }
         }
       }
@@ -423,7 +423,7 @@ async function handleAdminCommand(interaction) {
         if (kit === 'Overall' || kit === 'Players') continue;
         for (const tier in rankings[kit]) {
           if (Array.isArray(rankings[kit][tier])) {
-            rankings[kit][tier] = rankings[kit][tier].map(p => (p.toLowerCase() === oldName.toLowerCase() ? newName : p));
+            rankings[kit][tier] = rankings[kit][tier].map(p => ((typeof p === 'object' ? p.name : p || '').toString().toLowerCase() === oldName.toLowerCase() ? newName : p));
           }
         }
       }
@@ -452,7 +452,7 @@ async function handleAdminCommand(interaction) {
         if (!rankings[kit]) rankings[kit] = {};
         for (let t in rankings[kit]) {
           if (Array.isArray(rankings[kit][t])) {
-            rankings[kit][t] = rankings[kit][t].filter(p => p.toLowerCase() !== targetPlayer.toLowerCase());
+            rankings[kit][t] = rankings[kit][t].filter(p => (typeof p === 'object' ? p.name : p || '').toString().toLowerCase() !== targetPlayer.toLowerCase());
           }
         }
         if (!rankings[kit][cleanTier]) rankings[kit][cleanTier] = [];

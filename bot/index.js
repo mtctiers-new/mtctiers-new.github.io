@@ -77,44 +77,85 @@ client.once('ready', async () => {
   } catch (e) {
     console.warn('Queue panel startup update note:', e.message);
   }
+
+  try {
+    await refreshPlayerCache();
+    console.log(`✅ Loaded ${CACHED_PLAYER_LIST.length} players into high-speed autocomplete cache!`);
+  } catch (e) {
+    console.warn('Player cache startup note:', e.message);
+  }
 });
 
 let CACHED_PLAYER_LIST = [];
 let LAST_CACHE_TIME = 0;
 
-function getCachedPlayerList() {
-  const now = Date.now();
-  if (CACHED_PLAYER_LIST.length && (now - LAST_CACHE_TIME < 60000)) {
-    return CACHED_PLAYER_LIST;
+function buildPlayerListFromData(data) {
+  if (!data || typeof data !== 'object') return [];
+  const playerSet = new Set();
+
+  function isValidUsername(str) {
+    if (!str || typeof str !== 'string') return false;
+    const clean = str.replace(/\*/g, '').trim();
+    const lower = clean.toLowerCase();
+    if (lower.includes('promoted') || lower.includes('failed') || lower.includes('in ') || lower.includes('to ') || lower.includes('has been')) return false;
+    if (clean.includes(' ') && clean.length > 16) return false;
+    return clean.length >= 2 && clean.length <= 25;
   }
+
+  (data.Players || []).forEach(p => {
+    const name = typeof p === 'object' ? p.name : p;
+    if (isValidUsername(name)) playerSet.add(name.replace(/\*/g, '').trim());
+  });
+
+  Object.keys(data.Overall || {}).forEach(name => {
+    if (isValidUsername(name)) playerSet.add(name.replace(/\*/g, '').trim());
+  });
+
+  for (const kit in data) {
+    if (kit === 'Overall' || kit === 'Players' || kit === 'HallOfFame' || kit === 'Testers') continue;
+    const kitObj = data[kit];
+    if (!kitObj || typeof kitObj !== 'object') continue;
+    for (const tier in kitObj) {
+      if (Array.isArray(kitObj[tier])) {
+        kitObj[tier].forEach(p => {
+          const name = typeof p === 'object' ? p.name : p;
+          if (isValidUsername(name)) playerSet.add(name.replace(/\*/g, '').trim());
+        });
+      }
+    }
+  }
+
+  return Array.from(playerSet).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+}
+
+async function refreshPlayerCache() {
   try {
     const db = require('./firebase');
-    const rankings = db.loadLocalRankings();
-    const playerSet = new Set();
-
-    function isValidUsername(str) {
-      if (!str || typeof str !== 'string') return false;
-      const clean = str.replace(/\*/g, '').trim();
-      const lower = clean.toLowerCase();
-      if (lower.includes('promoted') || lower.includes('failed') || lower.includes('in ') || lower.includes('to ') || lower.includes('has been')) return false;
-      if (clean.includes(' ') && clean.length > 16) return false;
-      return clean.length >= 2 && clean.length <= 25;
+    const rankings = await db.getFullRankings();
+    const list = buildPlayerListFromData(rankings);
+    if (list.length) {
+      CACHED_PLAYER_LIST = list;
+      LAST_CACHE_TIME = Date.now();
     }
-
-    (rankings.Players || []).forEach(p => {
-      const name = typeof p === 'object' ? p.name : p;
-      if (isValidUsername(name)) playerSet.add(name.replace(/\*/g, '').trim());
-    });
-
-    Object.keys(rankings.Overall || {}).forEach(name => {
-      if (isValidUsername(name)) playerSet.add(name.replace(/\*/g, '').trim());
-    });
-
-    CACHED_PLAYER_LIST = Array.from(playerSet).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
-    LAST_CACHE_TIME = now;
   } catch (e) {
-    console.warn("Player cache note:", e.message);
+    console.warn("Failed to refresh player cache from Firestore:", e.message);
   }
+}
+
+function getCachedPlayerList() {
+  const now = Date.now();
+  if (!CACHED_PLAYER_LIST.length) {
+    try {
+      const db = require('./firebase');
+      const local = db.loadLocalRankings();
+      CACHED_PLAYER_LIST = buildPlayerListFromData(local);
+    } catch (e) {}
+  }
+
+  if (now - LAST_CACHE_TIME > 30000) {
+    refreshPlayerCache().catch(() => {});
+  }
+
   return CACHED_PLAYER_LIST;
 }
 
