@@ -1,4 +1,12 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:ital,wght@0,400;0,700;1,400&family=Outfit:wght@400;600;700;800;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,400;0,600;0,700;0,800;0,900;1,400;1,700&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:ital,wght@0,400;0,700;1,400&display=swap');
+
+@font-face {
+  font-family: 'MultiCraftFont';
+  src: url('assets/MultiCraftFont.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
 
 :root {
   
@@ -23,8 +31,9 @@
   --crimson: #ef4444;
   --grey: #6b7280;
 
-  --font-heading: 'Outfit', sans-serif;
-  --font-body: 'Inter', sans-serif;
+  --font-heading: 'MultiCraftFont', 'Montserrat', sans-serif;
+  --font-title: 'MultiCraftFont', 'Montserrat', sans-serif;
+  --font-body: 'Montserrat', 'Inter', sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
 
   --shadow-sm: 0 4px 12px rgba(0, 0, 0, 0.3);
