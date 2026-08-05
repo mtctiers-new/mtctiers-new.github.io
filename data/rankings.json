@@ -1,526 +1,246 @@
 {
+  "Overall": {
+    "TimmyLoal": 202,
+    "_Mario34_": 40,
+    "LastChance": 180,
+    "TERRORRR": 112,
+    "Dream_MultiCraft": 180,
+    "revan": 88,
+    "Kaeye": 26,
+    "shadow_master": 23,
+    "Solace": 44,
+    "LifoMC": 130,
+    "Mane": 35,
+    "MENDOR": 68,
+    "Possessed_YT": 110,
+    "Jerryisking": 112,
+    "bluedigit": 9,
+    "ramin_RG": 36,
+    "Terminator": 122,
+    "CosmicallyXVII": 57,
+    "jogg": 130,
+    "vort3x": 70,
+    "CJSHORT": 45,
+    "-_Hades_-": 100,
+    "Vorthexis": 172,
+    "Luther": 6,
+    "spareman2": 3,
+    "skibidi1234": 150,
+    "sample": 150,
+    "x9jm": 210,
+    "Game1K": 390,
+    "Husky_Multicraft": 56,
+    "RayValidd": 44,
+    "Atomix": 9,
+    "system1117": 230,
+    "chi-na": 3,
+    "-R3ZN-": 8,
+    "Ron_": 3,
+    "sazoryy": 3,
+    "Herobrine": 8,
+    "Redistdrext": 28,
+    "Ashar": 60,
+    "MGK": 2,
+    "ArpanYT": 3,
+    "Duality": 1,
+    "Fortress": 1,
+    "Nepali_Gamer": 1,
+    "-_Joker_-": 1,
+    "M0rt7uxMC": 20,
+    "SHADE": 20,
+    "Normal": 20,
+    "ghost133": 20,
+    "FarXD": 7,
+    "AntonioZga9": 2,
+    "Jetbunz99": 2,
+    "Superboy": 2,
+    "ItzNoob_": 30,
+    "Ayush_maan234": 30,
+    "MrDaRkYT": 30,
+    "Oden_Sama": 30,
+    "DivyamGamerYT": 82,
+    "SJ_GHOST": 5,
+    "Kirby": 5,
+    "NetworkHero": 5,
+    "drago": 5,
+    "MatrixOP980": 7,
+    "SaintOfZytrox": 5,
+    "-_ItsEthanLIT_-": 5,
+    "xenoXD": 5,
+    "PVP_PC_KAMIL69": 5,
+    "Rangee": 12,
+    "amjad": 12,
+    "Space2k": 24,
+    "Afdemonking": 1,
+    "Azula": 2,
+    "ghost123": 30,
+    "Glitch_Leaf": 3,
+    "sol": 5,
+    "MrLivingstone": 5,
+    "ziadlive": 12,
+    "Corpse": 5
+  },
   "Players": [
     {
-      "name": "x9jm",
-      "region": "NA",
-      "device": "MK"
-    },
-    {
-      "name": "system1117",
-      "region": "NA",
-      "device": "MK"
-    },
-    {
-      "name": "Vorthexis",
-      "region": "NA",
-      "device": "MK"
-    },
-    {
-      "name": "Possessed_YT",
-      "region": "NA",
-      "device": "MK"
-    },
-    {
-      "name": "TimmyLoal",
+      "device": "MK",
       "region": "OC",
-      "device": "MK"
+      "name": "TimmyLoal"
     },
     {
-      "name": "skibidi1234",
-      "region": "AS",
-      "device": "MK"
-    },
-    {
-      "name": "DivyamGamerYT",
-      "region": "AS",
-      "device": "MK"
-    },
-    {
-      "name": "revan",
-      "region": "NA",
-      "device": "TP"
-    },
-    {
-      "name": "ItzNoob_",
-      "region": "AS",
-      "device": "MK"
-    },
-    {
-      "name": "FarXD",
-      "region": "AS",
-      "device": "MB"
-    },
-    {
-      "name": "drago",
-      "region": "AS",
-      "device": "MK"
-    },
-    {
-      "name": "Kirby",
-      "region": "AS",
-      "device": "MK"
-    },
-    {
-      "name": "NetworkHero",
-      "region": "EU",
-      "device": "MK"
-    },
-    {
-      "name": "LifoMC",
-      "region": "AF",
-      "device": "MK"
-    },
-    {
-      "name": "AntonioZga9",
-      "region": "NA",
-      "device": "MB"
-    },
-    {
-      "name": "MGK",
-      "region": "AS",
-      "device": "MB"
-    },
-    {
-      "name": "ArpanYT",
-      "region": "AS",
-      "device": "MB"
-    },
-    {
-      "name": "MatrixOP980",
-      "region": "AS",
-      "device": "MB"
-    },
-    {
-      "name": "SaintOfZytrox",
-      "region": "AS",
-      "device": "MB"
-    },
-    {
-      "name": "f0rg1v3n",
-      "region": "AS",
-      "device": "MK"
-    },
-    {
-      "name": "Afdemonking",
-      "region": "EU",
-      "device": "MB"
-    },
-    {
-      "name": "CosmicallyXVII",
-      "region": "EU",
-      "device": "MK"
-    },
-    {
-      "name": "M0rt7uxMC",
-      "region": "AS",
-      "device": "MK"
-    },
-    {
-      "name": "Mane",
-      "region": "EU",
-      "device": "MB"
-    },
-    {
-      "name": "Jerryisking",
-      "region": "AS",
-      "device": "MK"
-    },
-    {
-      "name": "chi-na",
-      "region": "EU",
-      "device": "MK"
-    },
-    {
-      "name": "CJSHORT",
-      "region": "EU",
-      "device": "MK"
-    },
-    {
-      "name": "Husky_Multicraft",
-      "region": "NA",
-      "device": "MK"
-    },
-    {
-      "name": "RayValidd",
-      "region": "AS",
-      "device": "MK"
-    },
-    {
-      "name": "-_ItsEthanLIT_-",
-      "region": "SA",
-      "device": "CT"
-    },
-    {
-      "name": "Jetbunz99",
-      "region": "AS",
-      "device": "MB"
-    },
-    {
-      "name": "Oden_Sama",
-      "region": "Unknown",
-      "device": "MB"
-    },
-    {
-      "name": "xenoXD",
-      "region": "AS",
-      "device": "MB"
-    },
-    {
-      "name": "MrDaRkYT",
-      "region": "AS",
-      "device": "MK"
-    },
-    {
-      "name": "Herobrine",
-      "region": "NA",
-      "device": "MK"
-    },
-    {
-      "name": "LastChance",
-      "region": "NA",
-      "device": "MK"
-    },
-    {
-      "name": "Solace",
-      "region": "AS",
-      "device": "MK"
-    },
-    {
-      "name": "-R3ZN-",
-      "region": "NA",
-      "device": "MB"
-    },
-    {
-      "name": "SJ_GHOST",
-      "region": "NA",
-      "device": "MK"
-    },
-    {
-      "name": "Luther",
-      "region": "NA",
-      "device": "MB"
-    },
-    {
-      "name": "vort3x",
-      "region": "EU",
-      "device": "MK"
-    },
-    {
-      "name": "Dream_MultiCraft",
-      "region": "AS",
-      "device": "MK"
-    },
-    {
-      "name": "shadow_master",
-      "region": "NA",
-      "device": "CT"
-    },
-    {
-      "name": "bluedigit",
-      "region": "SA",
-      "device": "MB"
-    },
-    {
-      "name": "Ayush_maan234",
-      "region": "AS",
-      "device": "MK"
-    },
-    {
-      "name": "Corpse",
-      "region": "NA",
-      "device": "CT"
-    },
-    {
-      "name": "Kaeye",
-      "region": "NA",
-      "device": "MB"
-    },
-    {
-      "name": "Game1K",
-      "region": "NA",
-      "device": "MK"
-    },
-    {
-      "name": "SHADE",
-      "region": "AS",
-      "device": "MK"
-    },
-    {
-      "name": "Terminator",
-      "region": "AS",
-      "device": "MK"
-    },
-    {
-      "name": "Duality",
-      "region": "AS",
-      "device": "MB"
-    },
-    {
-      "name": "Superboy",
-      "region": "AF",
-      "device": "MB"
-    },
-    {
-      "name": "jogg",
-      "region": "NA",
-      "device": "CT"
-    },
-    {
-      "name": "Atomix",
-      "region": "NA",
-      "device": "MB"
-    },
-    {
-      "name": "Ron_",
-      "region": "Unknown",
-      "device": "MK"
-    },
-    {
-      "name": "Normal",
-      "region": "EU",
-      "device": "MK"
-    },
-    {
-      "name": "TERRORRR",
-      "region": "AS",
-      "device": "MK"
-    },
-    {
-      "name": "MTCTIERS",
-      "region": "MTCTIERS",
-      "device": "MTCTIERS"
-    },
-    {
-      "name": "Redistdrext",
-      "region": "AS",
-      "device": "MK"
-    },
-    {
-      "name": "MENDOR",
-      "region": "AF",
-      "device": "MK"
-    },
-    {
-      "name": "ziadlive",
-      "region": "AF",
-      "device": "MK"
-    },
-    {
-      "name": "Fortress",
-      "region": "Unknown",
-      "device": "Unknown"
-    },
-    {
-      "name": "ghost123",
-      "region": "AS",
-      "device": "MB"
-    },
-    {
-      "name": "sample",
-      "region": "AS",
-      "device": "TP"
-    },
-    {
-      "name": "-_Hades_-",
-      "region": "NA",
-      "device": "MK"
-    },
-    {
-      "name": "Ashar",
-      "region": "AS",
-      "device": "MK"
-    },
-    {
-      "name": "spareman2",
-      "region": "AS",
-      "device": "MB"
-    },
-    {
+      "device": "MK",
+      "skinUrl": "https://media.discordapp.net/attachments/1534311514054594681/1534318670572949504/Screenshot_2026-08-04_at_11.53.23_AM.png?ex=6a73b11d&is=6a725f9d&hm=bc553ac2dd01935231cf36e26971d70ac2aadeebae6a91ea0f279010e980165f&=&format=webp&quality=lossless",
       "name": "_Mario34_",
-      "region": "NA",
-      "device": "MK"
+      "region": "EU"
     },
     {
-      "name": "ChillPotato",
-      "region": "SA",
-      "device": "MK"
-    },
-    {
-      "name": "Charm_Of_Luck",
-      "region": "NA",
-      "device": "MK"
-    },
-    {
-      "name": "Space2k",
-      "region": "NA",
-      "device": "MK"
-    },
-    {
-      "name": "MrLivingstone",
-      "region": "AS",
-      "device": "MB"
-    },
-    {
-      "name": "Verlin",
-      "region": "NA",
-      "device": "MB"
-    },
-    {
-      "name": "<<< . ., > .,/",
-      "region": "Unknown",
-      "device": ",.,/ , <<"
-    },
-    {
-      "name": "PVP_PC_KAMIL69",
+      "skinUrl": "https://cdn.discordapp.com/ephemeral-attachments/1534308955642265715/1534330139171881050/1000005982.png?ex=6a73bbcb&is=6a726a4b&hm=93d9074a5851342406cd2b2990fd3ae17efa78e51ca20e529b766f3e2b074ac4&",
+      "device": "MK",
       "region": "EU",
-      "device": "MK"
-    },
-    {
-      "name": "-_Joker_-",
-      "region": "NA",
-      "device": "MB"
+      "name": "LastChance"
     }
   ],
-  "Emerald": {
-    "HT1": [
-      "Game1K"
-    ],
-    "LT1": [
-      "system1117"
-    ],
-    "RLT1": [
-      "Dream_MultiCraft",
-      "TimmyLoal"
-    ],
-    "HT2": [
-      "sample",
-      "Vorthexis",
-      "x9jm",
-      "ghost123"
-    ],
-    "LT2": [
-      "jogg",
-      "RayValidd",
-      "Redistdrext",
-      "skibidi1234"
-    ],
+  "Diamond": {
     "RHT2": [
-      "DivyamGamerYT",
-      "Ashar",
-      "Possessed_YT",
-      "Jerryisking",
+      "TimmyLoal",
+      "TERRORRR",
+      "Dream_MultiCraft",
       "revan"
     ],
-    "RLT2": [
-      "LifoMC"
-    ],
-    "HT3": [
-      "CJSHORT",
-      "CosmicallyXVII",
-      "Husky_Multicraft",
-      "Terminator",
-      "-_Hades_-",
-      "LastChance",
-      "Space2k",
-      "ziadlive"
-    ],
-    "RHT3": [
-      "Mane"
-    ],
-    "RLT3": [
-      "vort3x",
-      "Solace",
-      "MENDOR"
-    ],
-    "HT4": [
-      "FarXD",
+    "LT3": [
       "Kaeye",
       "shadow_master",
-      "sol",
-      "MrLivingstone",
-      "-R3ZN-"
-    ],
-    "LT4": [
-      "Glitch_Leaf"
-    ],
-    "HT5": [
-      "ArpanYT",
-      "MatrixOP980",
-      "Luther",
-      "bluedigit",
-      "Azula"
-    ],
-    "LT5": [
-      "MGK",
-      "Afdemonking",
-      "spareman2"
-    ]
-  },
-  "Emerald KB": {
-    "HT1": [
-      "Game1K"
-    ],
-    "LT1": [
-      "system1117"
-    ],
-    "HT2": [
-      "jogg",
-      "sample"
-    ],
-    "LT2": [
-      "Terminator",
-      "skibidi1234",
-      "LastChance",
-      "x9jm"
-    ],
-    "RHT2": [
-      "Vorthexis",
-      "TimmyLoal",
-      "Jerryisking"
+      "Solace"
     ],
     "RLT2": [
       "LifoMC",
-      "TERRORRR",
-      "Dream_MultiCraft",
-      "Possessed_YT"
+      "Mane",
+      "MENDOR",
+      "Possessed_YT",
+      "Jerryisking"
     ],
-    "LT3": [
-      "Husky_Multicraft",
-      "-_Hades_-"
+    "LT4": [
+      "bluedigit",
+      "ramin_RG"
     ],
-    "RHT3": [
-      "DivyamGamerYT",
+    "LT1": [
+      "Terminator",
+      "_Mario34_"
+    ],
+    "LT2": [
+      "CosmicallyXVII",
+      "jogg",
       "vort3x",
-      "revan"
+      "CJSHORT",
+      "-_Hades_-",
+      "Vorthexis",
+      "LastChance"
+    ],
+    "LT5": [
+      "Luther",
+      "spareman2"
     ],
     "RLT3": [
       "Solace"
     ],
+    "HT2": [
+      "ramin_RG",
+      "skibidi1234",
+      "sample",
+      "x9jm"
+    ],
+    "HT1": [
+      "Game1K"
+    ],
+    "HT3": [
+      "Husky_Multicraft",
+      "RayValidd"
+    ],
     "HT4": [
-      "CosmicallyXVII",
-      "Corpse"
+      "Atomix"
     ],
-    "LT4": [
-      "shadow_master"
+    "RHT1": [
+      "system1117"
+    ]
+  },
+  "Dragonhide Anchor": {
+    "Unranked": [
+      "-_Hades_-"
     ],
-    "HT5": [
-      "bluedigit"
+    "HT2": [
+      "x9jm",
+      "Dream_MultiCraft"
+    ],
+    "LT1": [
+      "Game1K"
+    ],
+    "LT3": [
+      "LastChance"
+    ],
+    "LT2": [
+      "skibidi1234",
+      "Vorthexis",
+      "system1117",
+      "TimmyLoal",
+      "LastChance"
     ],
     "LT5": [
-      "Luther"
+      "spareman2"
     ]
   },
   "Dragonhide KB": {
-    "HT1": [
-      "Game1K"
+    "LT4": [
+      "chi-na",
+      "-R3ZN-",
+      "Ron_",
+      "sazoryy",
+      "ramin_RG"
+    ],
+    "RLT2": [
+      "skibidi1234",
+      "MENDOR",
+      "Possessed_YT"
+    ],
+    "LT3": [
+      "Herobrine",
+      "Kaeye",
+      "Redistdrext"
+    ],
+    "RHT2": [
+      "vort3x",
+      "TERRORRR",
+      "TimmyLoal",
+      "Dream_MultiCraft",
+      "Ashar"
     ],
     "LT1": [
       "system1117",
       "jogg"
     ],
-    "RLT1": [
-      "DivyamGamerYT",
-      "LifoMC"
+    "LT5": [
+      "MGK",
+      "ArpanYT",
+      "bluedigit",
+      "Duality",
+      "Fortress",
+      "Nepali_Gamer",
+      "-_Joker_-"
+    ],
+    "LT2": [
+      "M0rt7uxMC",
+      "CosmicallyXVII",
+      "SHADE",
+      "Normal",
+      "ghost133",
+      "-_Hades_-",
+      "Vorthexis"
+    ],
+    "HT5": [
+      "FarXD",
+      "AntonioZga9",
+      "Jetbunz99",
+      "Luther",
+      "Superboy",
+      "Atomix"
     ],
     "HT2": [
       "ItzNoob_",
@@ -532,46 +252,22 @@
       "LastChance",
       "x9jm"
     ],
-    "LT2": [
-      "M0rt7uxMC",
-      "CosmicallyXVII",
-      "SHADE",
-      "Normal",
-      "ghost133",
-      "-_Hades_-",
-      "Vorthexis"
+    "RLT3": [
+      "revan"
     ],
-    "RHT2": [
-      "vort3x",
-      "TERRORRR",
-      "TimmyLoal",
-      "Dream_MultiCraft",
-      "Ashar"
-    ],
-    "RLT2": [
-      "skibidi1234",
-      "MENDOR",
-      "Possessed_YT"
-    ],
-    "HT3": [
-      "Husky_Multicraft",
-      "CJSHORT",
-      "RayValidd",
-      "Rangee",
-      "amjad",
-      "Space2k"
-    ],
-    "LT3": [
-      "Herobrine",
-      "Kaeye",
-      "Redistdrext"
+    "RLT1": [
+      "DivyamGamerYT",
+      "LifoMC"
     ],
     "RHT3": [
       "Solace",
       "Jerryisking"
     ],
-    "RLT3": [
-      "revan"
+    "RLT4": [
+      "Mane"
+    ],
+    "HT1": [
+      "Game1K"
     ],
     "HT4": [
       "shadow_master",
@@ -585,148 +281,198 @@
       "xenoXD",
       "PVP_PC_KAMIL69"
     ],
-    "LT4": [
-      "chi-na",
-      "-R3ZN-",
-      "Ron_",
-      "sazoryy",
-      "ramin_RG"
-    ],
-    "RLT4": [
-      "Mane"
-    ],
-    "HT5": [
-      "FarXD",
-      "AntonioZga9",
-      "Jetbunz99",
-      "Luther",
-      "Superboy",
-      "Atomix"
-    ],
-    "LT5": [
-      "MGK",
-      "ArpanYT",
-      "bluedigit",
-      "Duality",
-      "Fortress",
-      "Nepali_Gamer",
-      "-_Joker_-"
+    "HT3": [
+      "Husky_Multicraft",
+      "CJSHORT",
+      "RayValidd",
+      "Rangee",
+      "amjad",
+      "Space2k"
     ]
   },
-  "Manhunt": {
-    "HT1": [
-      "Game1K"
+  "Emerald": {
+    "LT5": [
+      "MGK",
+      "Afdemonking",
+      "spareman2"
+    ],
+    "LT2": [
+      "jogg",
+      "RayValidd",
+      "Redistdrext",
+      "skibidi1234"
+    ],
+    "HT5": [
+      "ArpanYT",
+      "MatrixOP980",
+      "Luther",
+      "bluedigit",
+      "Azula"
+    ],
+    "HT2": [
+      "sample",
+      "Vorthexis",
+      "x9jm",
+      "ghost123"
+    ],
+    "RLT3": [
+      "vort3x",
+      "Solace",
+      "MENDOR"
+    ],
+    "LT4": [
+      "Glitch_Leaf"
+    ],
+    "RLT2": [
+      "LifoMC"
+    ],
+    "RHT2": [
+      "DivyamGamerYT",
+      "Ashar",
+      "Possessed_YT",
+      "Jerryisking",
+      "revan"
     ],
     "LT1": [
       "system1117"
     ],
+    "HT4": [
+      "FarXD",
+      "Kaeye",
+      "shadow_master",
+      "sol",
+      "MrLivingstone",
+      "-R3ZN-"
+    ],
+    "HT3": [
+      "CJSHORT",
+      "CosmicallyXVII",
+      "Husky_Multicraft",
+      "Terminator",
+      "-_Hades_-",
+      "LastChance",
+      "Space2k",
+      "ziadlive"
+    ],
+    "RLT1": [
+      "Dream_MultiCraft",
+      "TimmyLoal"
+    ],
+    "RHT3": [
+      "Mane"
+    ],
+    "HT1": [
+      "Game1K"
+    ]
+  },
+  "Emerald KB": {
+    "HT1": [
+      "Game1K"
+    ],
+    "RHT3": [
+      "DivyamGamerYT",
+      "vort3x",
+      "revan"
+    ],
+    "HT4": [
+      "CosmicallyXVII",
+      "Corpse"
+    ],
+    "LT3": [
+      "Husky_Multicraft",
+      "-_Hades_-"
+    ],
+    "RHT2": [
+      "Vorthexis",
+      "TimmyLoal",
+      "Jerryisking"
+    ],
+    "LT4": [
+      "shadow_master"
+    ],
+    "RLT2": [
+      "LifoMC",
+      "TERRORRR",
+      "Dream_MultiCraft",
+      "Possessed_YT"
+    ],
+    "LT1": [
+      "system1117"
+    ],
+    "HT5": [
+      "bluedigit"
+    ],
+    "LT2": [
+      "Terminator",
+      "skibidi1234",
+      "LastChance",
+      "x9jm"
+    ],
+    "LT5": [
+      "Luther"
+    ],
     "HT2": [
+      "jogg",
       "sample"
     ],
+    "RLT3": [
+      "Solace"
+    ]
+  },
+  "Manhunt": {
     "LT2": [
       "jogg",
       "Terminator",
       "-_Hades_-",
       "Vorthexis",
       "LastChance"
-    ],
-    "RHT2": [
-      "LifoMC",
-      "Dream_MultiCraft"
-    ],
-    "RLT2": [
-      "skibidi1234",
-      "TERRORRR",
-      "TimmyLoal",
-      "x9jm",
-      "MENDOR",
-      "Possessed_YT",
-      "Jerryisking"
     ],
     "HT3": [
       "Husky_Multicraft"
     ],
-    "RLT3": [
-      "revan"
-    ],
-    "HT4": [
-      "Kaeye"
+    "RRHT3": [
+      "vort3x"
     ],
     "HT5": [
       "shadow_master",
       "Atomix"
     ],
+    "HT4": [
+      "Kaeye"
+    ],
     "LT5": [
       "bluedigit"
     ],
-    "RRHT3": [
-      "vort3x"
-    ]
-  },
-  "Diamond": {
-    "HT1": [
-      "Game1K"
-    ],
-    "LT1": [
-      "Terminator",
-      "_Mario34_"
-    ],
-    "RHT1": [
-      "system1117"
-    ],
-    "HT2": [
-      "ramin_RG",
-      "skibidi1234",
-      "sample",
-      "x9jm"
-    ],
-    "LT2": [
-      "CosmicallyXVII",
-      "jogg",
-      "vort3x",
-      "CJSHORT",
-      "-_Hades_-",
-      "Vorthexis",
-      "LastChance"
-    ],
-    "RHT2": [
-      "TimmyLoal",
-      "TERRORRR",
-      "Dream_MultiCraft",
+    "RLT3": [
       "revan"
     ],
-    "RLT2": [
+    "HT2": [
+      "sample"
+    ],
+    "RHT2": [
       "LifoMC",
-      "Mane",
+      "Dream_MultiCraft"
+    ],
+    "RLT2": [
+      "skibidi1234",
+      "TERRORRR",
+      "TimmyLoal",
+      "x9jm",
       "MENDOR",
       "Possessed_YT",
       "Jerryisking"
     ],
-    "HT3": [
-      "Husky_Multicraft",
-      "RayValidd"
+    "HT1": [
+      "Game1K"
     ],
-    "LT3": [
-      "Kaeye",
-      "shadow_master",
-      "Solace"
-    ],
-    "RLT3": [
-      "Solace"
-    ],
-    "HT4": [
-      "Atomix"
-    ],
-    "LT4": [
-      "bluedigit",
-      "ramin_RG"
-    ],
-    "LT5": [
-      "Luther",
-      "spareman2"
+    "LT1": [
+      "system1117"
     ]
   },
   "Novelty Axe": {
+    "HT2": [
+      "LastChance"
+    ],
     "LT2": [
       "-_Hades_-",
       "skibidi1234",
@@ -735,43 +481,18 @@
     "HT1": [
       "Game1K"
     ],
-    "HT2": [
-      "LastChance"
-    ],
     "HT3": [
       "Vorthexis",
       "TimmyLoal"
-    ]
-  },
-  "Dragonhide Anchor": {
-    "LT1": [
-      "Game1K"
-    ],
-    "HT2": [
-      "x9jm",
-      "Dream_MultiCraft"
-    ],
-    "LT2": [
-      "skibidi1234",
-      "Vorthexis",
-      "system1117",
-      "TimmyLoal",
-      "LastChance"
-    ],
-    "LT3": [
-      "LastChance"
-    ],
-    "LT5": [
-      "spareman2"
-    ],
-    "Unranked": [
-      "-_Hades_-"
     ]
   },
   "Void": {
     "HT1": [
       "Game1K"
     ],
+    "RHT3": [
+      "TERRORRR"
+    ],
     "HT2": [
       "x9jm"
     ],
@@ -782,98 +503,26 @@
     "RLT2": [
       "TimmyLoal"
     ],
-    "RHT3": [
-      "TERRORRR"
-    ],
     "LT5": [
       "CJSHORT"
     ]
   },
-  "Overall": {
-    "Game1K": 390,
-    "system1117": 230,
-    "x9jm": 210,
-    "TimmyLoal": 202,
-    "LastChance": 180,
-    "Dream_MultiCraft": 180,
-    "Vorthexis": 172,
-    "skibidi1234": 150,
-    "sample": 150,
-    "LifoMC": 130,
-    "jogg": 130,
-    "Terminator": 122,
-    "Jerryisking": 112,
-    "TERRORRR": 112,
-    "Possessed_YT": 110,
-    "-_Hades_-": 100,
-    "revan": 88,
-    "DivyamGamerYT": 82,
-    "vort3x": 82,
-    "MENDOR": 68,
-    "Ashar": 60,
-    "CosmicallyXVII": 57,
-    "Husky_Multicraft": 56,
-    "CJSHORT": 45,
-    "RayValidd": 44,
-    "Solace": 44,
-    "_Mario34_": 40,
-    "ramin_RG": 36,
-    "Mane": 35,
-    "ItzNoob_": 30,
-    "Oden_Sama": 30,
-    "MrDaRkYT": 30,
-    "Ayush_maan234": 30,
-    "ghost123": 30,
-    "Redistdrext": 28,
-    "Kaeye": 26,
-    "Space2k": 24,
-    "shadow_master": 23,
-    "M0rt7uxMC": 20,
-    "SHADE": 20,
-    "Normal": 20,
-    "ghost133": 20,
-    "ziadlive": 12,
-    "Rangee": 12,
-    "amjad": 12,
-    "bluedigit": 9,
-    "Atomix": 9,
-    "Herobrine": 8,
-    "-R3ZN-": 8,
-    "FarXD": 7,
-    "MatrixOP980": 7,
-    "Luther": 6,
-    "drago": 5,
-    "Kirby": 5,
-    "NetworkHero": 5,
-    "SaintOfZytrox": 5,
-    "-_ItsEthanLIT_-": 5,
-    "xenoXD": 5,
-    "SJ_GHOST": 5,
-    "Corpse": 5,
-    "MrLivingstone": 5,
-    "PVP_PC_KAMIL69": 5,
-    "sol": 5,
-    "ArpanYT": 3,
-    "chi-na": 3,
-    "Ron_": 3,
-    "spareman2": 3,
-    "Glitch_Leaf": 3,
-    "sazoryy": 3,
-    "AntonioZga9": 2,
-    "MGK": 2,
-    "Jetbunz99": 2,
-    "Superboy": 2,
-    "Azula": 2,
-    "Afdemonking": 1,
-    "Duality": 1,
-    "Fortress": 1,
-    "-_Joker_-": 1,
-    "Nepali_Gamer": 1,
-    "f0rg1v3n": 0,
-    "MTCTIERS": 0,
-    "ChillPotato": 0,
-    "Charm_Of_Luck": 0,
-    "Verlin": 0,
-    "<<< . ., > .,/": 0
+  "all_data": {
+    "Overall": {},
+    "Players": [
+      {
+        "skinUrl": "https://cdn.discordapp.com/ephemeral-attachments/1534308955642265713/1534315409493331968/b1aaa0c750f910802e86ceed01694aae.webp?ex=6a73ae13&is=6a725c93&hm=e81259b31e198114dac3954234953de88ea642a70a773f8a79df6a94f143136a&",
+        "device": "MK",
+        "region": "EU",
+        "name": "LastChance"
+      }
+    ]
+  },
+  "queue_state": {
+    "panelChannelId": "1524107242394091630",
+    "panelMessageId": "1534336608726286479",
+    "onlineTesters": [],
+    "lastSession": "Active now (11:08 PM)",
+    "queue": []
   }
 }
