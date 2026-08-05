@@ -958,12 +958,9 @@ async function openProfile(name) {
   const targetP = name.toLowerCase().trim();
 
   const canEdit = IS_ADMIN || 
-                  assignedP === '*' || 
-                  assignedP === targetP || 
-                  (EMAIL_TO_PLAYER[userEmail] || '').toLowerCase() === targetP || 
-                  userEmail === targetP ||
-                  (CURRENT_USER?.displayName || '').toLowerCase().trim() === targetP ||
-                  (CURRENT_USER?.displayName || '').toLowerCase().trim().includes(targetP);
+                  (assignedP !== '' && assignedP !== '*' && assignedP === targetP) ||
+                  ((EMAIL_TO_PLAYER[userEmail] || '').toLowerCase() === targetP && targetP !== '') ||
+                  (userEmail === targetP && targetP !== '');
 
   if (pEditBtn) {
     pEditBtn.style.display = canEdit ? 'inline-flex' : 'none';
@@ -1290,8 +1287,6 @@ function openEditProfileModal() {
   document.getElementById('epSkinUrl').value = pDetail.skinUrl || '';
   document.getElementById('epBannerUrl').value = pDetail.bannerUrl || '';
   document.getElementById('epColor').value = pDetail.accentColor || '#00eeff';
-  document.getElementById('epDevice').value = pDetail.device || 'MK';
-  document.getElementById('epRegion').value = pDetail.region || 'EU';
   document.getElementById('epLfm').value = pDetail.lfm ? 'ON' : 'OFF';
   document.getElementById('epRival').value = pDetail.rival || '';
   document.getElementById('epDesc').value = pDetail.description || '';
@@ -1311,11 +1306,24 @@ function closeEditProfileModalOnBackdrop(e) {
 
 async function saveProfileCustomization() {
   if (!CURRENT_PLAYER) return;
+
+  const userEmail = (CURRENT_USER?.email || '').toLowerCase().trim();
+  const assignedP = (CURRENT_ASSIGNED_PLAYER || '').toLowerCase().trim();
+  const targetP = CURRENT_PLAYER.toLowerCase().trim();
+
+  const canEdit = IS_ADMIN || 
+                  (assignedP !== '' && assignedP !== '*' && assignedP === targetP) ||
+                  ((EMAIL_TO_PLAYER[userEmail] || '').toLowerCase() === targetP && targetP !== '') ||
+                  (userEmail === targetP && targetP !== '');
+
+  if (!canEdit) {
+    alert("❌ Permission Denied: You are only authorized to edit your assigned player profile.");
+    return;
+  }
+
   const skinUrl = document.getElementById('epSkinUrl').value.trim();
   const bannerUrl = document.getElementById('epBannerUrl').value.trim();
   const accentColor = document.getElementById('epColor').value;
-  const device = document.getElementById('epDevice').value;
-  const region = document.getElementById('epRegion').value;
   const lfm = document.getElementById('epLfm').value === 'ON';
   const rival = document.getElementById('epRival').value.trim();
   const description = document.getElementById('epDesc').value.trim();
@@ -1329,8 +1337,6 @@ async function saveProfileCustomization() {
     skinUrl,
     bannerUrl,
     accentColor,
-    device,
-    region,
     lfm,
     rival,
     description
