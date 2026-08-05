@@ -231,31 +231,30 @@ function parseFirestoreValue(fieldVal) {
   return null;
 }
 
-function parseFirestoreMap(fieldsObj) {
-  const obj = {};
-  for (const [k, v] of Object.entries(fieldsObj)) {
-    obj[k] = parseFirestoreValue(v);
+const KNOWN_ASSET_SKINS = new Set([
+  'game1k', 'system1117', 'timmyloal', 'x9jm', 'ziadlive', 'vorthexis', 'farxd', 'rangee', 'sample'
+]);
+
+function getPlayerSkinSrc(name) {
+  if (!name) return 'assets/mtctiers_default_skin.png';
+  const cleanName = (typeof name === 'object' ? name.name : name || '').toString().toLowerCase().trim();
+  
+  const pDetail = (DATA.Players || []).find(p => (typeof p === 'object' ? p.name : p || '').toString().toLowerCase().trim() === cleanName) || {};
+  if (pDetail.skinUrl && pDetail.skinUrl.trim()) {
+    return pDetail.skinUrl.trim();
   }
-  return obj;
+  
+  if (KNOWN_ASSET_SKINS.has(cleanName)) {
+    return `assets/${cleanName}.png`;
+  }
+
+  return 'assets/mtctiers_default_skin.png';
 }
 
 function getPlayerMeta(name) {
   if (!name) return {};
   const clean = name.toLowerCase().trim();
   return (DATA.Players || []).find(p => (typeof p === 'object' ? p.name : p).toLowerCase().trim() === clean) || {};
-}
-
-function parseFirestoreMap(fields) {
-  if (!fields) return {};
-  const obj = {};
-  for (let k in fields) {
-    const valObj = fields[k];
-    if (valObj.stringValue !== undefined) obj[k] = valObj.stringValue;
-    else if (valObj.booleanValue !== undefined) obj[k] = valObj.booleanValue;
-    else if (valObj.integerValue !== undefined) obj[k] = parseInt(valObj.integerValue, 10);
-    else if (valObj.doubleValue !== undefined) obj[k] = parseFloat(valObj.doubleValue);
-  }
-  return obj;
 }
 
 async function loadRankingsData() {
@@ -403,7 +402,7 @@ function renderOverallLeaderboard() {
       <div class="podium-card rank-${rank}" onclick="openProfile('${name}')">
         <span class="podium-rank-badge">#${rank}</span>
         <div class="podium-avatar-wrap">
-          <img src="${skinPath}" alt="${name}" class="podium-avatar" onerror="this.style.opacity='0.2'">
+          <img src="${skinPath}" alt="${name}" class="podium-avatar" onerror="this.src='assets/mtctiers_default_skin.png'">
         </div>
         <div class="podium-name">${name}</div>
         <div class="podium-pts">${pts} PTS</div>
@@ -431,7 +430,7 @@ function renderOverallLeaderboard() {
       <div class="overall-row" onclick="openProfile('${name}')">
         <div class="ol-rank">#${rank}</div>
         <div class="ol-player">
-          <img src="${skinPath}" class="ol-avatar" onerror="this.style.opacity='0.2'">
+          <img src="${skinPath}" class="ol-avatar" onerror="this.src='assets/mtctiers_default_skin.png'">
           <span class="ol-name">${name}</span>
         </div>
         <div class="ol-pts">${pts}</div>
@@ -509,7 +508,7 @@ function getKitVerticalTierHtml(kitName) {
 
       html += `
         <div class="tier-card" onclick="openProfile('${player}')">
-          <img src="${skinPath}" class="tier-card-avatar" onerror="this.src='assets/steve.png'">
+          <img src="${skinPath}" class="tier-card-avatar" onerror="this.src='assets/mtctiers_default_skin.png'">
           <div class="tier-card-info">
             <div class="tier-card-name">${player}</div>
             <div class="tier-card-badge">${tierLabel}</div>
@@ -910,7 +909,7 @@ async function openProfile(name) {
 
   const skinImg = document.getElementById('pSkinImg');
   skinImg.src = getPlayerSkinSrc(name);
-  skinImg.onerror = function() { this.style.opacity = '0.2'; };
+  skinImg.onerror = function() { this.src = 'assets/mtctiers_default_skin.png'; this.style.opacity = '1'; };
 
   document.getElementById('pName').innerText = name;
 
@@ -1149,24 +1148,6 @@ function renderProfileKitGrid(name) {
   }
 
   container.innerHTML = html;
-}
-
-const KNOWN_ASSET_SKINS = new Set([
-  "farxd", "game1k", "rangee", "sample", "system1117", 
-  "timmyloal", "vorthexis", "x9jm", "ziadlive"
-]);
-
-function getPlayerSkinSrc(name) {
-  if (!name) return 'assets/mtctiers_default_skin.png';
-  const cleanName = name.toLowerCase().trim();
-  const pDetail = (DATA.Players || []).find(p => (typeof p === 'object' ? p.name : p).toLowerCase() === cleanName) || {};
-  if (pDetail.skinUrl && pDetail.skinUrl.trim()) {
-    return pDetail.skinUrl.trim();
-  }
-  if (KNOWN_ASSET_SKINS.has(cleanName)) {
-    return `assets/${cleanName}.png`;
-  }
-  return 'assets/mtctiers_default_skin.png';
 }
 
 function getPlayerKitBadges(name) {
