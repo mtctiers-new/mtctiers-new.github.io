@@ -117,31 +117,48 @@ async function checkWhitelistStatus(email) {
   }
 }
 
-async function loginWithGoogle() {
-  if (auth) {
-    try {
-      const provider = new firebase.auth.GoogleAuthProvider();
-      provider.setCustomParameters({ prompt: 'select_account' });
-      await auth.signInWithPopup(provider);
-      showToast("✅ Logged in successfully!");
-      return;
-    } catch (e) {
-      console.warn("Google Auth popup note:", e.code || e.message);
-    }
+function loginWithGoogle() {
+  document.getElementById('staffLoginModalOverlay').classList.add('active');
+}
+
+function closeStaffLoginModal() {
+  document.getElementById('staffLoginModalOverlay').classList.remove('active');
+}
+
+function closeStaffLoginModalOnBackdrop(e) {
+  if (e.target.id === 'staffLoginModalOverlay') {
+    closeStaffLoginModal();
   }
+}
 
-  const pass = prompt("🔑 Whitelisted Staff Login:\n\nEnter your Whitelisted Email (e.g. ziadn6b@gmail.com) or Username / Staff Password:");
-  if (!pass) return;
+async function submitStaffLogin() {
+  const input = document.getElementById('loginAccountInput');
+  const val = input.value.trim().toLowerCase();
+  if (!val) return alert("Please enter your Whitelisted Email, Username, or Staff Password.");
 
-  const clean = pass.trim().toLowerCase();
-  const isWhitelisted = ['ziadn6b@gmail.com', 'v4n1shedytoffical@gmail.com', 'ziadn6b', 'ziadlive', 'mtcstaff2026'].includes(clean) || WHITELIST_EMAILS.map(e => e.toLowerCase()).includes(clean);
+  const isWhitelisted = ['ziadn6b@gmail.com', 'v4n1shedytoffical@gmail.com', 'ziadn6b', 'ziadlive', 'vorthexis', 'mtcstaff2026'].includes(val) || WHITELIST_EMAILS.map(e => e.toLowerCase()).includes(val);
 
   if (isWhitelisted) {
-    const finalName = (clean === 'mtcstaff2026' || clean === 'ziadn6b') ? 'ziadn6b@gmail.com' : clean;
+    const finalName = (val === 'mtcstaff2026' || val === 'ziadn6b' || val === 'ziadlive') ? 'ziadn6b@gmail.com' : (val === 'vorthexis' ? 'v4n1shedytoffical@gmail.com' : val);
     setStaffAdminLoggedIn(finalName);
-    showToast("✅ Staff Admin Logged In!");
+    closeStaffLoginModal();
+    showToast(`✅ Welcome Staff Admin ${finalName}!`);
   } else {
-    alert("❌ Access Denied: Account is not in Whitelist.");
+    alert("❌ Access Denied: Account or Password is not in Whitelist.");
+  }
+}
+
+async function tryGoogleLoginAuth() {
+  if (!auth) return alert("Firebase Auth SDK not initialized.");
+  try {
+    const provider = new firebase.auth.GoogleAuthProvider();
+    provider.setCustomParameters({ prompt: 'select_account' });
+    await auth.signInWithPopup(provider);
+    closeStaffLoginModal();
+    showToast("✅ Signed in with Google!");
+  } catch (e) {
+    console.warn("Google Auth popup note:", e.code || e.message);
+    alert("Google Sign-In Note: " + (e.message || "Failed to open popup. Please use Whitelisted Email or Staff Password above."));
   }
 }
 
@@ -284,7 +301,7 @@ function computeOverallPoints() {
       const points = PTS_POINTS[cleanTier] || 0;
       if (Array.isArray(DATA[kit][tier])) {
         DATA[kit][tier].forEach(p => {
-          const name = p.trim();
+          const name = typeof p === 'object' ? p.name : (p || '').toString().trim();
           if (name) {
             DATA.Overall[name] = (DATA.Overall[name] || 0) + points;
           }
