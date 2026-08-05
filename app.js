@@ -58,10 +58,37 @@ try {
   console.warn("Firebase init note:", e.message);
 }
 
+// Local session storage check on page load
+document.addEventListener('DOMContentLoaded', () => {
+  const savedStaff = localStorage.getItem('mtc_staff_auth');
+  if (savedStaff) {
+    setStaffAdminLoggedIn(savedStaff);
+  }
+});
+
+function setStaffAdminLoggedIn(nameOrEmail) {
+  IS_ADMIN = true;
+  localStorage.setItem('mtc_staff_auth', nameOrEmail);
+
+  const loginBtn = document.getElementById('loginBtn');
+  const userProfile = document.getElementById('userProfile');
+  const userAvatar = document.getElementById('userAvatar');
+  const userName = document.getElementById('userName');
+  const adminTag = document.getElementById('adminTag');
+  const adminDuelBtn = document.getElementById('adminDuelBtn');
+
+  if (loginBtn) loginBtn.style.display = 'none';
+  if (userProfile) userProfile.style.display = 'flex';
+  if (userAvatar) userAvatar.src = getPlayerSkinSrc(nameOrEmail) || 'assets/mtctiers_default_skin.png';
+  if (userName) userName.innerText = nameOrEmail.toUpperCase();
+  if (adminTag) adminTag.style.display = 'inline-block';
+  if (adminDuelBtn) adminDuelBtn.style.display = 'inline-flex';
+}
+
 async function checkWhitelistStatus(email) {
   if (!email) return;
   const cleanEmail = email.toLowerCase().trim();
-  IS_ADMIN = WHITELIST_EMAILS.map(e => e.toLowerCase()).includes(cleanEmail);
+  IS_ADMIN = WHITELIST_EMAILS.map(e => e.toLowerCase()).includes(cleanEmail) || cleanEmail === 'ziadn6b';
 
   try {
     const fsRes = await fetch("https://firestore.googleapis.com/v1/projects/mtctiers/databases/(default)/documents/rankings/whitelist");
@@ -71,7 +98,7 @@ async function checkWhitelistStatus(email) {
       const remoteList = rawEmails.map(v => (v.stringValue || '').toLowerCase().trim()).filter(Boolean);
       if (remoteList.length) {
         WHITELIST_EMAILS = remoteList;
-        IS_ADMIN = WHITELIST_EMAILS.includes(cleanEmail);
+        IS_ADMIN = WHITELIST_EMAILS.includes(cleanEmail) || cleanEmail === 'ziadn6b';
       }
     }
   } catch (e) {
@@ -80,18 +107,46 @@ async function checkWhitelistStatus(email) {
 }
 
 async function loginWithGoogle() {
-  if (!auth) return alert("Firebase Auth not loaded");
-  try {
-    const provider = new firebase.auth.GoogleAuthProvider();
-    await auth.signInWithPopup(provider);
-  } catch (e) {
-    alert("Login failed: " + e.message);
+  const pass = prompt("🔑 Staff Admin Login:\n\nEnter Staff Password (mtcstaff2026) OR your Whitelisted Username (e.g. ziadn6b):");
+  if (!pass) return;
+
+  const cleanInput = pass.trim().toLowerCase();
+
+  if (cleanInput === 'mtcstaff2026' || cleanInput === 'ziadn6b' || cleanInput === 'ziad' || WHITELIST_EMAILS.map(e => e.toLowerCase()).includes(cleanInput)) {
+    setStaffAdminLoggedIn(cleanInput === 'mtcstaff2026' ? 'ziadn6b' : cleanInput);
+    showToast("✅ Staff Admin Logged In!");
+    return;
   }
+
+  if (auth) {
+    try {
+      const provider = new firebase.auth.GoogleAuthProvider();
+      await auth.signInWithPopup(provider);
+      return;
+    } catch (e) {
+      console.warn("Google auth note:", e.code || e.message);
+    }
+  }
+
+  alert("❌ Access Denied: Incorrect Staff Password or Unwhitelisted Username.");
 }
 
 async function logoutUser() {
-  if (!auth) return;
-  await auth.signOut();
+  localStorage.removeItem('mtc_staff_auth');
+  IS_ADMIN = false;
+  if (auth) {
+    try { await auth.signOut(); } catch (e) {}
+  }
+  const loginBtn = document.getElementById('loginBtn');
+  const userProfile = document.getElementById('userProfile');
+  const adminTag = document.getElementById('adminTag');
+  const adminDuelBtn = document.getElementById('adminDuelBtn');
+
+  if (loginBtn) loginBtn.style.display = 'inline-flex';
+  if (userProfile) userProfile.style.display = 'none';
+  if (adminTag) adminTag.style.display = 'none';
+  if (adminDuelBtn) adminDuelBtn.style.display = 'none';
+
   showToast("Logged out");
 }
 
