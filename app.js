@@ -74,6 +74,31 @@ document.addEventListener('DOMContentLoaded', async () => {
   handleUrlParamsOnLoad();
 });
 
+function parseFirestoreValue(fieldVal) {
+  if (!fieldVal) return null;
+  if ('stringValue' in fieldVal) return fieldVal.stringValue;
+  if ('integerValue' in fieldVal) return parseInt(fieldVal.integerValue, 10);
+  if ('doubleValue' in fieldVal) return parseFloat(fieldVal.doubleValue);
+  if ('booleanValue' in fieldVal) return fieldVal.booleanValue;
+  if ('arrayValue' in fieldVal) return (fieldVal.arrayValue?.values || []).map(parseFirestoreValue);
+  if ('mapValue' in fieldVal) return parseFirestoreMap(fieldVal.mapValue?.fields || {});
+  return null;
+}
+
+function parseFirestoreMap(fieldsObj) {
+  const obj = {};
+  for (const [k, v] of Object.entries(fieldsObj)) {
+    obj[k] = parseFirestoreValue(v);
+  }
+  return obj;
+}
+
+function getPlayerMeta(name) {
+  if (!name) return {};
+  const clean = name.toLowerCase().trim();
+  return (DATA.Players || []).find(p => (typeof p === 'object' ? p.name : p).toLowerCase().trim() === clean) || {};
+}
+
 async function loadRankingsData() {
   try {
     const res = await fetch(`data/rankings.json?v=${Date.now()}`);
@@ -735,7 +760,7 @@ async function openProfile(name) {
 
   animatePointsCount(targetPts);
 
-  const pDetail = (DATA.Players || []).find(p => p.name === name) || {};
+  const pDetail = getPlayerMeta(name);
   const descEl = document.getElementById('pDescription');
   if (pDetail.description && pDetail.description.trim()) {
     descEl.innerText = pDetail.description;
@@ -964,12 +989,15 @@ function getPlayerKitBadges(name) {
 }
 
 function filterPlayerVisible(name) {
-  const region = document.getElementById('filterRegion').value;
-  const device = document.getElementById('filterDevice').value;
-  const pDetail = (DATA.Players || []).find(p => p.name === name);
+  const regionEl = document.getElementById('filterRegion');
+  const deviceEl = document.getElementById('filterDevice');
+  const region = regionEl ? regionEl.value : '';
+  const device = deviceEl ? deviceEl.value : '';
 
-  if (region && pDetail && pDetail.region !== region) return false;
-  if (device && pDetail && pDetail.device !== device) return false;
+  const pDetail = getPlayerMeta(name);
+
+  if (region && pDetail.region !== region) return false;
+  if (device && pDetail.device !== device) return false;
 
   return true;
 }
