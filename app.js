@@ -38,19 +38,25 @@ try {
 
         await checkWhitelistStatus(user.email);
 
+        const adminDashBtn = document.getElementById('adminDashBtn');
+
         if (IS_ADMIN) {
           if (adminTag) adminTag.style.display = 'inline-block';
           if (adminDuelBtn) adminDuelBtn.style.display = 'inline-flex';
+          if (adminDashBtn) adminDashBtn.style.display = 'inline-flex';
         } else {
           if (adminTag) adminTag.style.display = 'none';
           if (adminDuelBtn) adminDuelBtn.style.display = 'none';
+          if (adminDashBtn) adminDashBtn.style.display = 'none';
         }
       } else {
         IS_ADMIN = false;
+        const adminDashBtn = document.getElementById('adminDashBtn');
         if (loginBtn) loginBtn.style.display = 'inline-flex';
         if (userProfile) userProfile.style.display = 'none';
         if (adminTag) adminTag.style.display = 'none';
         if (adminDuelBtn) adminDuelBtn.style.display = 'none';
+        if (adminDashBtn) adminDashBtn.style.display = 'none';
       }
     });
   }
@@ -85,10 +91,15 @@ function setStaffAdminLoggedIn(nameOrEmail) {
   if (adminDuelBtn) adminDuelBtn.style.display = 'inline-flex';
 }
 
+const EMAIL_TO_PLAYER = {
+  'ziadn6b@gmail.com': 'ziadlive',
+  'v4n1shedytoffical@gmail.com': 'vorthexis'
+};
+
 async function checkWhitelistStatus(email) {
   if (!email) return;
   const cleanEmail = email.toLowerCase().trim();
-  IS_ADMIN = WHITELIST_EMAILS.map(e => e.toLowerCase()).includes(cleanEmail) || cleanEmail === 'ziadn6b';
+  IS_ADMIN = WHITELIST_EMAILS.map(e => e.toLowerCase()).includes(cleanEmail) || ['ziadn6b@gmail.com', 'v4n1shedytoffical@gmail.com', 'ziadn6b'].includes(cleanEmail);
 
   try {
     const fsRes = await fetch("https://firestore.googleapis.com/v1/projects/mtctiers/databases/(default)/documents/rankings/whitelist");
@@ -98,7 +109,7 @@ async function checkWhitelistStatus(email) {
       const remoteList = rawEmails.map(v => (v.stringValue || '').toLowerCase().trim()).filter(Boolean);
       if (remoteList.length) {
         WHITELIST_EMAILS = remoteList;
-        IS_ADMIN = WHITELIST_EMAILS.includes(cleanEmail) || cleanEmail === 'ziadn6b';
+        IS_ADMIN = WHITELIST_EMAILS.includes(cleanEmail) || ['ziadn6b@gmail.com', 'v4n1shedytoffical@gmail.com', 'ziadn6b'].includes(cleanEmail);
       }
     }
   } catch (e) {
@@ -107,28 +118,26 @@ async function checkWhitelistStatus(email) {
 }
 
 async function loginWithGoogle() {
-  const pass = prompt("🔑 Staff Admin Login:\n\nEnter Staff Password (mtcstaff2026) OR your Whitelisted Username (e.g. ziadn6b):");
-  if (!pass) return;
-
-  const cleanInput = pass.trim().toLowerCase();
-
-  if (cleanInput === 'mtcstaff2026' || cleanInput === 'ziadn6b' || cleanInput === 'ziad' || WHITELIST_EMAILS.map(e => e.toLowerCase()).includes(cleanInput)) {
-    setStaffAdminLoggedIn(cleanInput === 'mtcstaff2026' ? 'ziadn6b' : cleanInput);
-    showToast("✅ Staff Admin Logged In!");
-    return;
-  }
-
   if (auth) {
     try {
       const provider = new firebase.auth.GoogleAuthProvider();
       await auth.signInWithPopup(provider);
+      showToast("✅ Logged in successfully!");
       return;
     } catch (e) {
-      console.warn("Google auth note:", e.code || e.message);
+      console.warn("Google Auth popup failed:", e.message);
+      if (e.code === 'auth/configuration-not-found') {
+        const pass = prompt("🔑 Google Auth is waiting for Firebase Console activation.\n\nEnter Whitelisted Email or Staff Password (mtcstaff2026):");
+        if (!pass) return;
+        const clean = pass.trim().toLowerCase();
+        if (clean === 'mtcstaff2026' || clean === 'ziadn6b@gmail.com' || clean === 'v4n1shedytoffical@gmail.com' || WHITELIST_EMAILS.includes(clean)) {
+          setStaffAdminLoggedIn(clean);
+          return;
+        }
+      }
+      alert("Login failed: " + e.message);
     }
   }
-
-  alert("❌ Access Denied: Incorrect Staff Password or Unwhitelisted Username.");
 }
 
 async function logoutUser() {
@@ -892,6 +901,32 @@ async function openProfile(name) {
   animatePointsCount(targetPts);
 
   const pDetail = getPlayerMeta(name);
+
+  // Custom Banner / BG Image
+  const bannerEl = document.getElementById('pBanner');
+  if (bannerEl) {
+    if (pDetail.bannerUrl && pDetail.bannerUrl.trim()) {
+      bannerEl.style.backgroundImage = `url('${pDetail.bannerUrl.trim()}')`;
+      bannerEl.style.backgroundSize = 'cover';
+      bannerEl.style.backgroundPosition = 'center';
+    } else {
+      bannerEl.style.backgroundImage = 'none';
+    }
+  }
+
+  // Profile Edit button visibility check (Self or Admin)
+  const pEditBtn = document.getElementById('pEditBtn');
+  const userEmail = (CURRENT_USER?.email || localStorage.getItem('mtc_staff_auth') || '').toLowerCase().trim();
+  const isOwner = (EMAIL_TO_PLAYER[userEmail] || '').toLowerCase() === name.toLowerCase() || userEmail === name.toLowerCase();
+
+  if (pEditBtn) {
+    if (IS_ADMIN || isOwner) {
+      pEditBtn.style.display = 'inline-flex';
+    } else {
+      pEditBtn.style.display = 'none';
+    }
+  }
+
   const descEl = document.getElementById('pDescription');
   if (pDetail.description && pDetail.description.trim()) {
     descEl.innerText = pDetail.description;
@@ -1220,6 +1255,152 @@ async function submitDuelFromSite() {
     renderCurrentTab();
   } catch (e) {
     alert("Failed to submit duel: " + e.message);
+  }
+}
+
+function openEditProfileModal() {
+  if (!CURRENT_PLAYER) return;
+  const pDetail = getPlayerMeta(CURRENT_PLAYER);
+
+  document.getElementById('epSub').innerText = `Editing profile for ${CURRENT_PLAYER}`;
+  document.getElementById('epSkinUrl').value = pDetail.skinUrl || '';
+  document.getElementById('epBannerUrl').value = pDetail.bannerUrl || '';
+  document.getElementById('epColor').value = pDetail.accentColor || '#00eeff';
+  document.getElementById('epDevice').value = pDetail.device || 'MK';
+  document.getElementById('epRegion').value = pDetail.region || 'EU';
+  document.getElementById('epLfm').value = pDetail.lfm ? 'ON' : 'OFF';
+  document.getElementById('epRival').value = pDetail.rival || '';
+  document.getElementById('epDesc').value = pDetail.description || '';
+
+  document.getElementById('editProfileModalOverlay').classList.add('active');
+}
+
+function closeEditProfileModal() {
+  document.getElementById('editProfileModalOverlay').classList.remove('active');
+}
+
+function closeEditProfileModalOnBackdrop(e) {
+  if (e.target.id === 'editProfileModalOverlay') {
+    closeEditProfileModal();
+  }
+}
+
+async function saveProfileCustomization() {
+  if (!CURRENT_PLAYER) return;
+  const skinUrl = document.getElementById('epSkinUrl').value.trim();
+  const bannerUrl = document.getElementById('epBannerUrl').value.trim();
+  const accentColor = document.getElementById('epColor').value;
+  const device = document.getElementById('epDevice').value;
+  const region = document.getElementById('epRegion').value;
+  const lfm = document.getElementById('epLfm').value === 'ON';
+  const rival = document.getElementById('epRival').value.trim();
+  const description = document.getElementById('epDesc').value.trim();
+
+  let pIndex = (DATA.Players || []).findIndex(p => (typeof p === 'object' ? p.name : p).toLowerCase() === CURRENT_PLAYER.toLowerCase());
+  let existingObj = pIndex !== -1 && typeof DATA.Players[pIndex] === 'object' ? DATA.Players[pIndex] : { name: CURRENT_PLAYER };
+
+  const updatedObj = {
+    ...existingObj,
+    name: CURRENT_PLAYER,
+    skinUrl,
+    bannerUrl,
+    accentColor,
+    device,
+    region,
+    lfm,
+    rival,
+    description
+  };
+
+  if (pIndex !== -1) {
+    DATA.Players[pIndex] = updatedObj;
+  } else {
+    if (!DATA.Players) DATA.Players = [];
+    DATA.Players.push(updatedObj);
+  }
+
+  showToast("Saving profile customization...");
+
+  try {
+    if (db) {
+      await db.collection('rankings').doc('players_meta').set({ players: DATA.Players }, { merge: true });
+    }
+    closeEditProfileModal();
+    openProfile(CURRENT_PLAYER);
+    renderCurrentTab();
+    showToast("✨ Profile updated successfully!");
+  } catch (e) {
+    alert("Failed to save profile: " + e.message);
+  }
+}
+
+function openAdminDashModal() {
+  if (!IS_ADMIN) return alert("Whitelisted admin access required.");
+  renderWhitelistItems();
+  document.getElementById('adminDashModalOverlay').classList.add('active');
+}
+
+function closeAdminDashModal() {
+  document.getElementById('adminDashModalOverlay').classList.remove('active');
+}
+
+function closeAdminDashModalOnBackdrop(e) {
+  if (e.target.id === 'adminDashModalOverlay') {
+    closeAdminDashModal();
+  }
+}
+
+function renderWhitelistItems() {
+  const container = document.getElementById('whitelistItemsList');
+  if (!container) return;
+
+  if (!WHITELIST_EMAILS || !WHITELIST_EMAILS.length) {
+    container.innerHTML = `<div style="color:var(--text-muted);font-size:0.85rem;">No whitelisted accounts</div>`;
+    return;
+  }
+
+  container.innerHTML = WHITELIST_EMAILS.map(email => `
+    <div class="whitelist-item-row">
+      <span>${email}</span>
+      <button onclick="removeEmailFromWhitelist('${email}')" class="whitelist-remove-btn">Remove</button>
+    </div>
+  `).join('');
+}
+
+async function addEmailToWhitelist() {
+  const input = document.getElementById('adNewEmail');
+  const val = input.value.trim().toLowerCase();
+  if (!val) return alert("Please enter an email or username");
+
+  if (WHITELIST_EMAILS.includes(val)) {
+    return alert("Account already whitelisted!");
+  }
+
+  WHITELIST_EMAILS.push(val);
+  input.value = '';
+  renderWhitelistItems();
+
+  try {
+    if (db) {
+      await db.collection('rankings').doc('whitelist').set({ emails: WHITELIST_EMAILS });
+      showToast(`Added ${val} to Whitelist!`);
+    }
+  } catch (e) {
+    alert("Failed to update whitelist: " + e.message);
+  }
+}
+
+async function removeEmailFromWhitelist(email) {
+  WHITELIST_EMAILS = WHITELIST_EMAILS.filter(e => e.toLowerCase() !== email.toLowerCase());
+  renderWhitelistItems();
+
+  try {
+    if (db) {
+      await db.collection('rankings').doc('whitelist').set({ emails: WHITELIST_EMAILS });
+      showToast(`Removed ${email} from Whitelist`);
+    }
+  } catch (e) {
+    alert("Failed to update whitelist: " + e.message);
   }
 }
 

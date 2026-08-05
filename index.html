@@ -53,12 +53,16 @@
     </div>
 
     <div class="nav-right">
+      <button id="adminDashBtn" class="btn-admin-dash" onclick="openAdminDashModal()" style="display:none;" title="Admin Whitelist Manager">
+        <span>⚙️ WHITELIST</span>
+      </button>
       <button id="adminDuelBtn" class="btn-admin-duel" onclick="openSubmitDuelModal()" style="display:none;">
         <span>⚔️ SUBMIT DUEL</span>
       </button>
       <div id="navAuth" class="nav-auth">
         <button id="loginBtn" class="btn-login" onclick="loginWithGoogle()">
-          <span style="margin-right:4px;">🔑</span>LOGIN
+          <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" style="width:16px;height:16px;margin-right:6px;vertical-align:middle;">
+          <span>LOGIN WITH GOOGLE</span>
         </button>
         <div id="userProfile" class="user-profile" style="display:none;" onclick="logoutUser()" title="Click to Logout">
           <img id="userAvatar" src="assets/mtctiers_default_skin.png" class="user-avatar" alt="User">
@@ -153,6 +157,7 @@
 
       <div class="profile-banner" id="pBanner">
         <div class="modal-actions">
+          <button id="pEditBtn" class="icon-btn" title="Edit Profile Settings (BG, PFP, Color)" onclick="openEditProfileModal()" style="display:none;background:rgba(0,238,255,0.2);border-color:var(--cyan);color:#fff;font-weight:700;">✏️ EDIT</button>
           <button class="icon-btn" title="Copy Profile Link" onclick="copyProfileLink()">🔗</button>
           <button class="icon-btn" title="Embed Profile" onclick="copyEmbedCode()">⚡</button>
           <button class="icon-btn" title="Close" onclick="closeProfileModal()">✕</button>
@@ -304,6 +309,96 @@
       </div>
 
       <button onclick="submitDuelFromSite()" class="auth-btn" style="margin-top:15px;width:100%;">SUBMIT & UPDATE TIER</button>
+    </div>
+  </div>
+
+  <!-- Edit Profile Modal (Self / Admin) -->
+  <div id="editProfileModalOverlay" class="modal-overlay" onclick="closeEditProfileModalOnBackdrop(event)">
+    <div class="submit-duel-card" onclick="event.stopPropagation()">
+      <div class="modal-close-btn" onclick="closeEditProfileModal()">✕</div>
+      <h2 class="modal-title">✏️ CUSTOMIZE PROFILE</h2>
+      <p class="modal-subtitle" id="epSub">Customize Profile BG, PFP, and Theme Color</p>
+
+      <div class="duel-form-group">
+        <label>Profile Picture / Skin Image URL</label>
+        <input type="text" id="epSkinUrl" class="form-input" placeholder="https://catbox.moe/example.png">
+      </div>
+
+      <div class="duel-form-group">
+        <label>Profile Background Banner Image URL</label>
+        <input type="text" id="epBannerUrl" class="form-input" placeholder="https://example.com/banner.jpg">
+      </div>
+
+      <div class="duel-form-row">
+        <div class="duel-form-group">
+          <label>Theme Accent Color</label>
+          <input type="color" id="epColor" class="form-input" value="#00eeff" style="height:42px;padding:4px;cursor:pointer;">
+        </div>
+        <div class="duel-form-group">
+          <label>Preferred Device</label>
+          <select id="epDevice" class="form-select">
+            <option value="MK">Mouse & Keyboard (MK)</option>
+            <option value="MB">Mobile (MB)</option>
+            <option value="CT">Controller (CT)</option>
+            <option value="TP">Trackpad (TP)</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="duel-form-row">
+        <div class="duel-form-group">
+          <label>Region</label>
+          <select id="epRegion" class="form-select">
+            <option value="NA">North America (NA)</option>
+            <option value="EU">Europe (EU)</option>
+            <option value="SA">South America (SA)</option>
+            <option value="AS">Asia (AS)</option>
+            <option value="OC">Oceania (OC)</option>
+            <option value="AF">Africa (AF)</option>
+          </select>
+        </div>
+        <div class="duel-form-group">
+          <label>LFM Status</label>
+          <select id="epLfm" class="form-select">
+            <option value="OFF">OFF</option>
+            <option value="ON">ON</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="duel-form-group">
+        <label>Rival</label>
+        <input type="text" id="epRival" class="form-input" placeholder="e.g. revan">
+      </div>
+
+      <div class="duel-form-group">
+        <label>Bio / Description</label>
+        <textarea id="epDesc" class="form-input" rows="3" placeholder="Enter custom bio..."></textarea>
+      </div>
+
+      <button onclick="saveProfileCustomization()" class="auth-btn" style="margin-top:10px;width:100%;">SAVE PROFILE CHANGES</button>
+    </div>
+  </div>
+
+  <!-- Admin Whitelist Dashboard Modal -->
+  <div id="adminDashModalOverlay" class="modal-overlay" onclick="closeAdminDashModalOnBackdrop(event)">
+    <div class="submit-duel-card" style="max-width:550px;" onclick="event.stopPropagation()">
+      <div class="modal-close-btn" onclick="closeAdminDashModal()">✕</div>
+      <h2 class="modal-title">⚙️ ADMIN WHITELIST DASHBOARD</h2>
+      <p class="modal-subtitle" id="adSub">Whitelist Email & User Management</p>
+
+      <div class="duel-form-group">
+        <label>Add Email or Username to Whitelist</label>
+        <div style="display:flex;gap:10px;">
+          <input type="text" id="adNewEmail" class="form-input" placeholder="e.g. ziadn6b@gmail.com or username">
+          <button onclick="addEmailToWhitelist()" class="auth-btn" style="width:auto;padding:0 20px;white-space:nowrap;">+ ADD</button>
+        </div>
+      </div>
+
+      <div class="duel-form-group">
+        <label>Whitelisted Accounts</label>
+        <div id="whitelistItemsList" style="max-height:220px;overflow-y:auto;background:rgba(13,15,23,0.9);border:1px solid var(--border-glass);border-radius:10px;padding:10px;display:flex;flex-direction:column;gap:8px;"></div>
+      </div>
     </div>
   </div>
 
