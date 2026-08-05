@@ -382,21 +382,36 @@
 
   <!-- Admin Whitelist Dashboard Modal -->
   <div id="adminDashModalOverlay" class="modal-overlay" onclick="closeAdminDashModalOnBackdrop(event)">
-    <div class="submit-duel-card" style="max-width:550px;" onclick="event.stopPropagation()">
+    <div class="submit-duel-card" style="max-width:580px;" onclick="event.stopPropagation()">
       <div class="modal-close-btn" onclick="closeAdminDashModal()">✕</div>
-      <h2 class="modal-title">⚙️ ADMIN WHITELIST DASHBOARD</h2>
-      <p class="modal-subtitle" id="adSub">Whitelist Email & User Management</p>
+      <h2 class="modal-title">⚙️ WHITELIST & PERMISSIONS MANAGER</h2>
+      <p class="modal-subtitle" id="adSub">Configure Admin rights and assigned player profile edit permissions</p>
 
       <div class="duel-form-group">
-        <label>Add Email or Username to Whitelist</label>
-        <div style="display:flex;gap:10px;">
-          <input type="text" id="adNewEmail" class="form-input" placeholder="e.g. ziadn6b@gmail.com or username">
-          <button onclick="addEmailToWhitelist()" class="auth-btn" style="width:auto;padding:0 20px;white-space:nowrap;">+ ADD</button>
+        <label>Account Email or Username</label>
+        <input type="text" id="adNewEmail" class="form-input" placeholder="e.g. player@gmail.com or username">
+      </div>
+
+      <div class="duel-form-row">
+        <div class="duel-form-group">
+          <label>Access Role</label>
+          <select id="adRole" class="form-select">
+            <option value="admin">Admin (Full Access)</option>
+            <option value="player">Player (Assigned Profile Only)</option>
+          </select>
+        </div>
+        <div class="duel-form-group">
+          <label>Modifiable Profile</label>
+          <select id="adAssignedPlayer" class="form-select">
+            <option value="*">All Profiles (*)</option>
+          </select>
         </div>
       </div>
 
+      <button onclick="addEmailToWhitelist()" class="auth-btn" style="margin-bottom:14px;width:100%;">+ ADD / UPDATE PERMISSIONS</button>
+
       <div class="duel-form-group">
-        <label>Whitelisted Accounts</label>
+        <label>Whitelisted Accounts & Roles</label>
         <div id="whitelistItemsList" style="max-height:220px;overflow-y:auto;background:rgba(13,15,23,0.9);border:1px solid var(--border-glass);border-radius:10px;padding:10px;display:flex;flex-direction:column;gap:8px;"></div>
       </div>
     </div>

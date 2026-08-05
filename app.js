@@ -64,14 +64,17 @@ try {
   console.warn("Firebase init note:", e.message);
 }
 
-let WHITELIST_HASHES = [
-  'd4a5b883a89d3c535ffb6bced51d56033b4d410fdd3fde242fae780bac7a4602', // ziadn6b@gmail.com
-  'de120db9844ffefef088609b949a32573699e2ab85ecbeb1482657ff5686632e', // v4n1shedytoffical@gmail.com
-  '261fe193200c0fba9f3c617e42f29dbcbe3dd2cecb63360b006af80be82f4203', // admin@mtctiers.com
-  'c45acd2b689ad993d32b110f6d55c0509d1b7f656ffe3afce0f490e35067addd', // mtctiers@gmail.com
-  '84fc42c02f3d15b767b048a150696fb0839904cbfb0a55e8133f022cce839dc2', // cicweb@gmail.com
-  'dbf7aa42a46b67af93a95d75332ec048b0cf448eaf2344d65b2a4ebb607a8f0d'  // game1k@mtctiers.com
+let WHITELIST_ENTRIES = [
+  { label: 'ziadn6b@gmail.com (Owner)', hash: 'd4a5b883a89d3c535ffb6bced51d56033b4d410fdd3fde242fae780bac7a4602', role: 'admin', assignedPlayer: '*' },
+  { label: 'v4n1shedytoffical@gmail.com (Admin)', hash: 'de120db9844ffefef088609b949a32573699e2ab85ecbeb1482657ff5686632e', role: 'admin', assignedPlayer: '*' },
+  { label: 'v41nshedytoffical@gmail.com (Admin)', hash: 'c0e9b169d9f8e920cdc57277caccbaa160e1e2b7d886952bb027b51330f5bb16', role: 'admin', assignedPlayer: '*' },
+  { label: 'vorthexis (Admin)', hash: '3eef6721a50faedfaaefa7c075faa4fb604f6b59dbed9b147ac953051934b452', role: 'admin', assignedPlayer: 'vorthexis' },
+  { label: 'v41nshed (Admin)', hash: 'b3339600b6cca216725b00048b34f873035b7e3c9d2f100ba33828adc045fa6f', role: 'admin', assignedPlayer: 'vorthexis' },
+  { label: 'v4n1shed (Admin)', hash: '45fa8d30db1adfac35b83544615eb76462ea55c0ed65069d7b584ad72b42d165', role: 'admin', assignedPlayer: 'vorthexis' }
 ];
+
+let CURRENT_ROLE = null;
+let CURRENT_ASSIGNED_PLAYER = '*';
 
 async function sha256Hex(str) {
   const buf = new TextEncoder().encode(str.toLowerCase().trim());
@@ -81,30 +84,48 @@ async function sha256Hex(str) {
 
 const EMAIL_TO_PLAYER = {
   'ziadn6b@gmail.com': 'ziadlive',
-  'v4n1shedytoffical@gmail.com': 'vorthexis'
+  'v4n1shedytoffical@gmail.com': 'vorthexis',
+  'v41nshedytoffical@gmail.com': 'vorthexis'
 };
 
 async function checkWhitelistStatus(email) {
   if (!email) {
     IS_ADMIN = false;
+    CURRENT_ROLE = null;
+    CURRENT_ASSIGNED_PLAYER = null;
     return;
   }
-  const emailHash = await sha256Hex(email);
-  IS_ADMIN = WHITELIST_HASHES.includes(emailHash);
+  const cleanEmail = email.toLowerCase().trim();
+  const emailHash = await sha256Hex(cleanEmail);
 
   try {
     const fsRes = await fetch("https://firestore.googleapis.com/v1/projects/mtctiers/databases/(default)/documents/rankings/whitelist");
     if (fsRes.ok) {
       const doc = await fsRes.json();
-      const rawHashes = doc.fields?.hashes?.arrayValue?.values || [];
-      const remoteList = rawHashes.map(v => v.stringValue).filter(Boolean);
-      if (remoteList.length) {
-        WHITELIST_HASHES = remoteList;
-        IS_ADMIN = WHITELIST_HASHES.includes(emailHash);
+      const rawEntriesStr = doc.fields?.entries?.stringValue;
+      if (rawEntriesStr) {
+        try {
+          const parsed = JSON.parse(rawEntriesStr);
+          if (Array.isArray(parsed) && parsed.length) {
+            WHITELIST_ENTRIES = parsed;
+          }
+        } catch (e) {}
       }
     }
   } catch (e) {
     console.warn("Whitelist fetch note:", e.message);
+  }
+
+  const matched = WHITELIST_ENTRIES.find(e => e.hash === emailHash || (e.label && e.label.toLowerCase().includes(cleanEmail)));
+
+  if (matched) {
+    CURRENT_ROLE = matched.role || 'player';
+    IS_ADMIN = (CURRENT_ROLE === 'admin');
+    CURRENT_ASSIGNED_PLAYER = matched.assignedPlayer || EMAIL_TO_PLAYER[cleanEmail] || '*';
+  } else {
+    IS_ADMIN = ['ziadn6b@gmail.com', 'v4n1shedytoffical@gmail.com', 'v41nshedytoffical@gmail.com'].includes(cleanEmail);
+    CURRENT_ROLE = IS_ADMIN ? 'admin' : 'player';
+    CURRENT_ASSIGNED_PLAYER = EMAIL_TO_PLAYER[cleanEmail] || '*';
   }
 }
 
@@ -123,6 +144,8 @@ async function loginWithGoogle() {
 
 async function logoutUser() {
   IS_ADMIN = false;
+  CURRENT_ROLE = null;
+  CURRENT_ASSIGNED_PLAYER = null;
   CURRENT_USER = null;
   if (auth) {
     try { await auth.signOut(); } catch (e) {}
@@ -138,25 +161,6 @@ async function logoutUser() {
   if (adminTag) adminTag.style.display = 'none';
   if (adminDuelBtn) adminDuelBtn.style.display = 'none';
   if (adminDashBtn) adminDashBtn.style.display = 'none';
-
-  showToast("Logged out");
-}
-
-async function logoutUser() {
-  localStorage.removeItem('mtc_staff_auth');
-  IS_ADMIN = false;
-  if (auth) {
-    try { await auth.signOut(); } catch (e) {}
-  }
-  const loginBtn = document.getElementById('loginBtn');
-  const userProfile = document.getElementById('userProfile');
-  const adminTag = document.getElementById('adminTag');
-  const adminDuelBtn = document.getElementById('adminDuelBtn');
-
-  if (loginBtn) loginBtn.style.display = 'inline-flex';
-  if (userProfile) userProfile.style.display = 'none';
-  if (adminTag) adminTag.style.display = 'none';
-  if (adminDuelBtn) adminDuelBtn.style.display = 'none';
 
   showToast("Logged out");
 }
@@ -944,17 +948,20 @@ async function openProfile(name) {
     }
   }
 
-  // Profile Edit button visibility check (Self or Admin)
+  // Profile Edit button visibility check (Self, Assigned Profile, or Admin)
   const pEditBtn = document.getElementById('pEditBtn');
-  const userEmail = (CURRENT_USER?.email || localStorage.getItem('mtc_staff_auth') || '').toLowerCase().trim();
-  const isOwner = (EMAIL_TO_PLAYER[userEmail] || '').toLowerCase() === name.toLowerCase() || userEmail === name.toLowerCase();
+  const userEmail = (CURRENT_USER?.email || '').toLowerCase().trim();
+  const assignedP = (CURRENT_ASSIGNED_PLAYER || '').toLowerCase().trim();
+  const targetP = name.toLowerCase().trim();
+
+  const canEdit = IS_ADMIN || 
+                  assignedP === '*' || 
+                  assignedP === targetP || 
+                  (EMAIL_TO_PLAYER[userEmail] || '').toLowerCase() === targetP || 
+                  userEmail === targetP;
 
   if (pEditBtn) {
-    if (IS_ADMIN || isOwner) {
-      pEditBtn.style.display = 'inline-flex';
-    } else {
-      pEditBtn.style.display = 'none';
-    }
+    pEditBtn.style.display = canEdit ? 'inline-flex' : 'none';
   }
 
   const descEl = document.getElementById('pDescription');
@@ -1366,6 +1373,14 @@ async function saveProfileCustomization() {
 
 function openAdminDashModal() {
   if (!IS_ADMIN) return alert("Whitelisted admin access required.");
+
+  const select = document.getElementById('adAssignedPlayer');
+  if (select) {
+    const players = Object.keys(DATA.Overall || {}).sort();
+    select.innerHTML = '<option value="*">All Profiles (*)</option>' +
+      players.map(p => `<option value="${p}">${p}</option>`).join('');
+  }
+
   renderWhitelistItems();
   document.getElementById('adminDashModalOverlay').classList.add('active');
 }
@@ -1380,34 +1395,28 @@ function closeAdminDashModalOnBackdrop(e) {
   }
 }
 
-const KNOWN_HASH_LABELS = {
-  'd4a5b883a89d3c535ffb6bced51d56033b4d410fdd3fde242fae780bac7a4602': 'ziadn6b@gmail.com (Owner)',
-  'de120db9844ffefef088609b949a32573699e2ab85ecbeb1482657ff5686632e': 'v4n1shedytoffical@gmail.com (Admin)',
-  'c0e9b169d9f8e920cdc57277caccbaa160e1e2b7d886952bb027b51330f5bb16': 'v41nshedytoffical@gmail.com (Admin)',
-  '3eef6721a50faedfaaefa7c075faa4fb604f6b59dbed9b147ac953051934b452': 'vorthexis (Admin)',
-  'b3339600b6cca216725b00048b34f873035b7e3c9d2f100ba33828adc045fa6f': 'v41nshed (Admin)',
-  '45fa8d30db1adfac35b83544615eb76462ea55c0ed65069d7b584ad72b42d165': 'v4n1shed (Admin)',
-  '261fe193200c0fba9f3c617e42f29dbcbe3dd2cecb63360b006af80be82f4203': 'admin@mtctiers.com',
-  'c45acd2b689ad993d32b110f6d55c0509d1b7f656ffe3afce0f490e35067addd': 'mtctiers@gmail.com',
-  '84fc42c02f3d15b767b048a150696fb0839904cbfb0a55e8133f022cce839dc2': 'cicweb@gmail.com',
-  'dbf7aa42a46b67af93a95d75332ec048b0cf448eaf2344d65b2a4ebb607a8f0d': 'game1k@mtctiers.com'
-};
-
 function renderWhitelistItems() {
   const container = document.getElementById('whitelistItemsList');
   if (!container) return;
 
-  if (!WHITELIST_HASHES || !WHITELIST_HASHES.length) {
-    container.innerHTML = `<div style="color:var(--text-muted);font-size:0.85rem;">No whitelisted accounts</div>`;
+  if (!WHITELIST_ENTRIES || !WHITELIST_ENTRIES.length) {
+    container.innerHTML = `<div style="color:var(--text-muted);font-size:0.85rem;">No whitelisted entries</div>`;
     return;
   }
 
-  container.innerHTML = WHITELIST_HASHES.map(hash => {
-    const label = KNOWN_HASH_LABELS[hash] || `Account (${hash.slice(0, 8)}...${hash.slice(-4)})`;
+  container.innerHTML = WHITELIST_ENTRIES.map(entry => {
+    const isAdm = entry.role === 'admin';
+    const profileTag = entry.assignedPlayer === '*' ? 'All Profiles (*)' : `Profile: ${entry.assignedPlayer}`;
     return `
-      <div class="whitelist-item-row">
-        <span style="font-family:var(--font-heading);font-size:0.85rem;font-weight:700;color:#fff;">${label}</span>
-        <button onclick="removeEmailFromWhitelist('${hash}')" class="whitelist-remove-btn">Remove</button>
+      <div class="whitelist-item-row" style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+        <div style="display:flex;flex-direction:column;gap:2px;">
+          <div style="font-family:var(--font-heading);font-weight:700;font-size:0.85rem;color:#fff;">
+            ${entry.label || entry.email || 'Whitelisted Account'}
+            <span style="margin-left:6px;font-size:0.7rem;padding:2px 6px;border-radius:4px;background:${isAdm ? 'rgba(168,85,247,0.25)' : 'rgba(0,238,255,0.2)'};color:${isAdm ? '#d8b4fe' : '#67e8f9'};border:1px solid ${isAdm ? '#a855f7' : '#00eeff'};">${(entry.role || 'player').toUpperCase()}</span>
+          </div>
+          <div style="font-family:var(--font-mono);font-size:0.75rem;color:var(--text-muted);">${profileTag}</div>
+        </div>
+        <button onclick="removeEmailFromWhitelist('${entry.hash}')" class="whitelist-remove-btn">Remove</button>
       </div>
     `;
   }).join('');
@@ -1415,23 +1424,43 @@ function renderWhitelistItems() {
 
 async function addEmailToWhitelist() {
   const input = document.getElementById('adNewEmail');
+  const roleSelect = document.getElementById('adRole');
+  const playerSelect = document.getElementById('adAssignedPlayer');
+
   const val = input.value.trim().toLowerCase();
+  const role = roleSelect ? roleSelect.value : 'player';
+  const assignedPlayer = playerSelect ? playerSelect.value : '*';
+
   if (!val) return alert("Please enter an email or username");
 
   const newHash = await sha256Hex(val);
 
-  if (WHITELIST_HASHES.includes(newHash)) {
-    return alert("Account hash already in Whitelist!");
+  let existingIndex = WHITELIST_ENTRIES.findIndex(e => e.hash === newHash || (e.label && e.label.toLowerCase().includes(val)));
+
+  const newEntry = {
+    label: `${val} (${role === 'admin' ? 'Admin' : 'Player'})`,
+    hash: newHash,
+    role,
+    assignedPlayer
+  };
+
+  if (existingIndex !== -1) {
+    WHITELIST_ENTRIES[existingIndex] = newEntry;
+  } else {
+    WHITELIST_ENTRIES.push(newEntry);
   }
 
-  WHITELIST_HASHES.push(newHash);
   input.value = '';
   renderWhitelistItems();
 
   try {
     if (db) {
-      await db.collection('rankings').doc('whitelist').set({ hashes: WHITELIST_HASHES });
-      showToast(`Added SHA-256 hash to Whitelist!`);
+      const hashes = WHITELIST_ENTRIES.map(e => e.hash);
+      await db.collection('rankings').doc('whitelist').set({
+        hashes,
+        entries: JSON.stringify(WHITELIST_ENTRIES)
+      });
+      showToast(`Saved ${val} permissions (${role.toUpperCase()})!`);
     }
   } catch (e) {
     alert("Failed to update whitelist: " + e.message);
@@ -1439,13 +1468,17 @@ async function addEmailToWhitelist() {
 }
 
 async function removeEmailFromWhitelist(targetHash) {
-  WHITELIST_HASHES = WHITELIST_HASHES.filter(h => h !== targetHash);
+  WHITELIST_ENTRIES = WHITELIST_ENTRIES.filter(e => e.hash !== targetHash);
   renderWhitelistItems();
 
   try {
     if (db) {
-      await db.collection('rankings').doc('whitelist').set({ hashes: WHITELIST_HASHES });
-      showToast(`Removed hash from Whitelist`);
+      const hashes = WHITELIST_ENTRIES.map(e => e.hash);
+      await db.collection('rankings').doc('whitelist').set({
+        hashes,
+        entries: JSON.stringify(WHITELIST_ENTRIES)
+      });
+      showToast(`Removed entry from Whitelist`);
     }
   } catch (e) {
     alert("Failed to update whitelist: " + e.message);
