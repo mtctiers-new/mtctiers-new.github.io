@@ -21,12 +21,13 @@
 
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 </head>
 <body>
 
   <div id="enterScreen" class="enter-screen" onclick="enterSite()">
     <div class="enter-content">
-      <img src="assets/mtctiers.png" alt="MTC Tiers Logo" class="enter-logo" onerror="this.src='assets/default.png'">
+      <img src="assets/mtctiers.png" alt="MTC Tiers Logo" class="enter-logo" onerror="this.src='assets/mtctiers_default_skin.png'">
       <h1 class="enter-title">MTC TIERS</h1>
       <p class="enter-subtitle">OFFICIAL PLAYER RANKINGS & PROFILES</p>
       <div class="enter-btn">
@@ -38,7 +39,7 @@
 
   <nav class="navbar">
     <div class="nav-brand" onclick="switchTab('home')">
-      <img src="assets/mtctiers.png" alt="MTC Tiers Logo" class="nav-logo" onerror="this.src='assets/default.png'">
+      <img src="assets/mtctiers.png" alt="MTC Tiers Logo" class="nav-logo" onerror="this.src='assets/mtctiers_default_skin.png'">
       <span class="nav-title">MTC TIERS</span>
     </div>
 
@@ -52,6 +53,19 @@
     </div>
 
     <div class="nav-right">
+      <button id="adminDuelBtn" class="btn-admin-duel" onclick="openSubmitDuelModal()" style="display:none;">
+        <span>⚔️ SUBMIT DUEL</span>
+      </button>
+      <div id="navAuth" class="nav-auth">
+        <button id="loginBtn" class="btn-login" onclick="loginWithGoogle()">
+          <span style="margin-right:4px;">🔑</span>LOGIN
+        </button>
+        <div id="userProfile" class="user-profile" style="display:none;" onclick="logoutUser()" title="Click to Logout">
+          <img id="userAvatar" src="assets/mtctiers_default_skin.png" class="user-avatar" alt="User">
+          <span id="userName" class="user-name"></span>
+          <span id="adminTag" class="admin-tag" style="display:none;">ADMIN</span>
+        </div>
+      </div>
       <div class="search-wrap">
         <span class="search-icon">🔍</span>
         <input type="text" id="playerSearch" class="search-input" placeholder="Search player..." oninput="handleSearch(this.value)" autocomplete="off">
@@ -216,6 +230,80 @@
         <button class="icon-btn" onclick="closeDuelPopup()">✕</button>
       </div>
       <div id="duelPopupContent"></div>
+    </div>
+  </div>
+
+  <!-- Submit Duel Modal (Admin Whitelisted) -->
+  <div id="submitDuelModalOverlay" class="modal-overlay" onclick="closeSubmitDuelModalOnBackdrop(event)">
+    <div class="submit-duel-card" onclick="event.stopPropagation()">
+      <div class="modal-close-btn" onclick="closeSubmitDuelModal()">✕</div>
+      <h2 class="modal-title">⚔️ SUBMIT DUEL RESULT</h2>
+      <p class="modal-subtitle">Logged in as Whitelisted Staff Admin</p>
+      
+      <div class="duel-form-group">
+        <label>Player 1 (MultiCraft Username)</label>
+        <input type="text" id="sdP1" class="form-input" placeholder="e.g. Game1K" required>
+      </div>
+
+      <div class="duel-form-group">
+        <label>Player 2 (MultiCraft Username)</label>
+        <input type="text" id="sdP2" class="form-input" placeholder="e.g. revan" required>
+      </div>
+
+      <div class="duel-form-row">
+        <div class="duel-form-group">
+          <label>Kit Category</label>
+          <select id="sdKit" class="form-select">
+            <option value="Emerald">Emerald</option>
+            <option value="Emerald KB">Emerald KB</option>
+            <option value="Dragonhide KB">Dragonhide KB</option>
+            <option value="Manhunt">Manhunt</option>
+            <option value="Diamond">Diamond</option>
+            <option value="Novelty Axe">Novelty Axe</option>
+            <option value="Dragonhide Anchor">Dragonhide Anchor</option>
+            <option value="Void">Void</option>
+          </select>
+        </div>
+        <div class="duel-form-group">
+          <label>Winner</label>
+          <input type="text" id="sdWinner" class="form-input" placeholder="e.g. Game1K" required>
+        </div>
+      </div>
+
+      <div class="duel-form-row">
+        <div class="duel-form-group">
+          <label>P1 Score</label>
+          <input type="number" id="sdS1" class="form-input" value="3" min="0">
+        </div>
+        <div class="duel-form-group">
+          <label>P2 Score</label>
+          <input type="number" id="sdS2" class="form-input" value="1" min="0">
+        </div>
+      </div>
+
+      <div class="duel-form-group">
+        <label>Outcome / Title</label>
+        <input type="text" id="sdOutcome" class="form-input" placeholder="e.g. Promoted, Rank Match, Tier Test" value="Rank Match">
+      </div>
+
+      <div class="duel-form-group">
+        <label>Auto-Update Winner Tier (Optional)</label>
+        <select id="sdNewTier" class="form-select">
+          <option value="">Do Not Change Tier</option>
+          <option value="HT1">HT1 (50 pts)</option>
+          <option value="LT1">LT1 (40 pts)</option>
+          <option value="HT2">HT2 (30 pts)</option>
+          <option value="LT2">LT2 (20 pts)</option>
+          <option value="HT3">HT3 (12 pts)</option>
+          <option value="LT3">LT3 (8 pts)</option>
+          <option value="HT4">HT4 (5 pts)</option>
+          <option value="LT4">LT4 (3 pts)</option>
+          <option value="HT5">HT5 (2 pts)</option>
+          <option value="LT5">LT5 (1 pt)</option>
+        </select>
+      </div>
+
+      <button onclick="submitDuelFromSite()" class="auth-btn" style="margin-top:15px;width:100%;">SUBMIT & UPDATE TIER</button>
     </div>
   </div>
 

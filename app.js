@@ -9,14 +9,90 @@ const firebaseConfig = {
 };
 
 let db = null;
+let auth = null;
+let CURRENT_USER = null;
+let IS_ADMIN = false;
+let WHITELIST_EMAILS = ['admin@mtctiers.com', 'mtctiers@gmail.com', 'cicweb@gmail.com', 'game1k@mtctiers.com'];
+
 try {
   if (typeof firebase !== 'undefined') {
     firebase.initializeApp(firebaseConfig);
     db = firebase.firestore();
+    auth = firebase.auth();
     console.log("Firebase initialized successfully.");
+
+    auth.onAuthStateChanged(async (user) => {
+      CURRENT_USER = user;
+      const loginBtn = document.getElementById('loginBtn');
+      const userProfile = document.getElementById('userProfile');
+      const userAvatar = document.getElementById('userAvatar');
+      const userName = document.getElementById('userName');
+      const adminTag = document.getElementById('adminTag');
+      const adminDuelBtn = document.getElementById('adminDuelBtn');
+
+      if (user) {
+        if (loginBtn) loginBtn.style.display = 'none';
+        if (userProfile) userProfile.style.display = 'flex';
+        if (userAvatar) userAvatar.src = user.photoURL || 'assets/mtctiers_default_skin.png';
+        if (userName) userName.innerText = user.displayName || user.email.split('@')[0];
+
+        await checkWhitelistStatus(user.email);
+
+        if (IS_ADMIN) {
+          if (adminTag) adminTag.style.display = 'inline-block';
+          if (adminDuelBtn) adminDuelBtn.style.display = 'inline-flex';
+        } else {
+          if (adminTag) adminTag.style.display = 'none';
+          if (adminDuelBtn) adminDuelBtn.style.display = 'none';
+        }
+      } else {
+        IS_ADMIN = false;
+        if (loginBtn) loginBtn.style.display = 'inline-flex';
+        if (userProfile) userProfile.style.display = 'none';
+        if (adminTag) adminTag.style.display = 'none';
+        if (adminDuelBtn) adminDuelBtn.style.display = 'none';
+      }
+    });
   }
 } catch (e) {
   console.warn("Firebase init note:", e.message);
+}
+
+async function checkWhitelistStatus(email) {
+  if (!email) return;
+  const cleanEmail = email.toLowerCase().trim();
+  IS_ADMIN = WHITELIST_EMAILS.map(e => e.toLowerCase()).includes(cleanEmail);
+
+  try {
+    const fsRes = await fetch("https://firestore.googleapis.com/v1/projects/mtctiers/databases/(default)/documents/rankings/whitelist");
+    if (fsRes.ok) {
+      const doc = await fsRes.json();
+      const rawEmails = doc.fields?.emails?.arrayValue?.values || [];
+      const remoteList = rawEmails.map(v => (v.stringValue || '').toLowerCase().trim()).filter(Boolean);
+      if (remoteList.length) {
+        WHITELIST_EMAILS = remoteList;
+        IS_ADMIN = WHITELIST_EMAILS.includes(cleanEmail);
+      }
+    }
+  } catch (e) {
+    console.warn("Whitelist fetch note:", e.message);
+  }
+}
+
+async function loginWithGoogle() {
+  if (!auth) return alert("Firebase Auth not loaded");
+  try {
+    const provider = new firebase.auth.GoogleAuthProvider();
+    await auth.signInWithPopup(provider);
+  } catch (e) {
+    alert("Login failed: " + e.message);
+  }
+}
+
+async function logoutUser() {
+  if (!auth) return;
+  await auth.signOut();
+  showToast("Logged out");
 }
 
 const AUTH_API = "https://mtc-backend-production-e0ab.up.railway.app/api";
@@ -954,7 +1030,7 @@ const KNOWN_ASSET_SKINS = new Set([
 ]);
 
 function getPlayerSkinSrc(name) {
-  if (!name) return 'assets/steve.png';
+  if (!name) return 'assets/mtctiers_default_skin.png';
   const cleanName = name.toLowerCase().trim();
   const pDetail = (DATA.Players || []).find(p => (typeof p === 'object' ? p.name : p).toLowerCase() === cleanName) || {};
   if (pDetail.skinUrl && pDetail.skinUrl.trim()) {
@@ -963,7 +1039,7 @@ function getPlayerSkinSrc(name) {
   if (KNOWN_ASSET_SKINS.has(cleanName)) {
     return `assets/${cleanName}.png`;
   }
-  return 'assets/steve.png';
+  return 'assets/mtctiers_default_skin.png';
 }
 
 function getPlayerKitBadges(name) {
@@ -1011,6 +1087,85 @@ function resetFilters() {
   document.getElementById('filterDevice').value = '';
   document.getElementById('filterRetired').value = 'active';
   renderCurrentTab();
+}
+
+function openSubmitDuelModal() {
+  if (!IS_ADMIN) return alert("Whitelisted staff admin access required.");
+  document.getElementById('submitDuelModalOverlay').classList.add('active');
+}
+
+function closeSubmitDuelModal() {
+  document.getElementById('submitDuelModalOverlay').classList.remove('active');
+}
+
+function closeSubmitDuelModalOnBackdrop(e) {
+  if (e.target.id === 'submitDuelModalOverlay') {
+    closeSubmitDuelModal();
+  }
+}
+
+async function submitDuelFromSite() {
+  if (!IS_ADMIN) return alert("Whitelisted staff admin access required.");
+
+  const p1 = document.getElementById('sdP1').value.trim();
+  const p2 = document.getElementById('sdP2').value.trim();
+  const kit = document.getElementById('sdKit').value;
+  const winner = document.getElementById('sdWinner').value.trim();
+  const s1 = parseInt(document.getElementById('sdS1').value, 10) || 0;
+  const s2 = parseInt(document.getElementById('sdS2').value, 10) || 0;
+  const outcome = document.getElementById('sdOutcome').value.trim() || 'Rank Match';
+  const newTier = document.getElementById('sdNewTier').value;
+
+  if (!p1 || !p2 || !winner) return alert("Please fill in Player 1, Player 2, and Winner!");
+
+  const dateStr = new Date().toISOString().split('T')[0];
+  const timestamp = Date.now();
+
+  const recordP1 = { timestamp, date: dateStr, kit, outcome, player1: p1, player2: p2, player1_score: s1, player2_score: s2, result: winner.toLowerCase() === p1.toLowerCase() ? 'Won' : 'Lost' };
+  const recordP2 = { timestamp, date: dateStr, kit, outcome, player1: p1, player2: p2, player1_score: s1, player2_score: s2, result: winner.toLowerCase() === p2.toLowerCase() ? 'Won' : 'Lost' };
+
+  showToast("Submitting duel & updating rankings...");
+
+  try {
+    if (db) {
+      const p1Ref = db.collection('duels').doc(p1);
+      const p1Doc = await p1Ref.get();
+      let p1List = p1Doc.exists && Array.isArray(p1Doc.data().duels) ? p1Doc.data().duels : [];
+      p1List.unshift(recordP1);
+      await p1Ref.set({ player: p1, duels: p1List, count: p1List.length, last_updated: dateStr }, { merge: true });
+
+      const p2Ref = db.collection('duels').doc(p2);
+      const p2Doc = await p2Ref.get();
+      let p2List = p2Doc.exists && Array.isArray(p2Doc.data().duels) ? p2Doc.data().duels : [];
+      p2List.unshift(recordP2);
+      await p2Ref.set({ player: p2, duels: p2List, count: p2List.length, last_updated: dateStr }, { merge: true });
+
+      if (newTier) {
+        const kitRef = db.collection('rankings').doc(kit);
+        const kitDoc = await kitRef.get();
+        let kitData = kitDoc.exists ? kitDoc.data() : {};
+        if (kitData.tiers) kitData = kitData.tiers;
+
+        for (let t in kitData) {
+          if (Array.isArray(kitData[t])) {
+            kitData[t] = kitData[t].filter(name => name.toLowerCase() !== winner.toLowerCase());
+          }
+        }
+        if (!kitData[newTier]) kitData[newTier] = [];
+        if (!kitData[newTier].includes(winner)) kitData[newTier].push(winner);
+
+        await kitRef.set({ tiers: kitData }, { merge: true });
+        DATA[kit] = kitData;
+        computeOverallPoints();
+      }
+    }
+
+    closeSubmitDuelModal();
+    showToast("⚔️ Duel recorded & Tier updated!");
+    renderCurrentTab();
+  } catch (e) {
+    alert("Failed to submit duel: " + e.message);
+  }
 }
 
 function handleSearch(val) {

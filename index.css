@@ -1893,3 +1893,136 @@ body {
   color: var(--text-dim);
   line-height: 1.5;
 }
+
+/* Tier 4 & Tier 5 Badges */
+.tier-t4 {
+  background: rgba(234, 179, 8, 0.15) !important;
+  border-color: rgba(234, 179, 8, 0.4) !important;
+  color: #eab308 !important;
+}
+.tier-t5 {
+  background: rgba(156, 163, 175, 0.15) !important;
+  border-color: rgba(156, 163, 175, 0.4) !important;
+  color: #9ca3af !important;
+}
+
+/* Nav Auth & Admin Duel Button */
+.btn-admin-duel {
+  padding: 8px 14px;
+  background: linear-gradient(135deg, #a855f7 0%, #7c3aed 100%);
+  color: #fff;
+  font-family: var(--font-heading);
+  font-weight: 800;
+  font-size: 0.8rem;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  box-shadow: 0 0 15px rgba(168, 85, 247, 0.4);
+  transition: all 0.25s ease;
+  margin-right: 8px;
+}
+.btn-admin-duel:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 0 25px rgba(168, 85, 247, 0.7);
+}
+
+.nav-auth {
+  display: flex;
+  align-items: center;
+  margin-right: 12px;
+}
+
+.user-profile {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(13, 27, 42, 0.8);
+  border: 1px solid var(--border-glass-hover);
+  padding: 4px 10px;
+  border-radius: 20px;
+  cursor: pointer;
+  transition: all 0.25s ease;
+}
+
+.user-profile:hover {
+  border-color: var(--cyan);
+  background: rgba(0, 238, 255, 0.1);
+}
+
+.user-avatar {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.user-name {
+  font-family: var(--font-heading);
+  font-weight: 700;
+  font-size: 0.8rem;
+  color: var(--text-main);
+}
+
+.admin-tag {
+  background: rgba(168, 85, 247, 0.2);
+  border: 1px solid rgba(168, 85, 247, 0.5);
+  color: var(--purple);
+  font-size: 0.65rem;
+  font-weight: 800;
+  padding: 2px 6px;
+  border-radius: 6px;
+  letter-spacing: 0.5px;
+}
+
+/* Submit Duel Modal */
+.submit-duel-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-glass-hover);
+  border-radius: 20px;
+  padding: 30px;
+  width: 100%;
+  max-width: 500px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8), var(--glow-cyan);
+  position: relative;
+}
+
+.duel-form-group {
+  margin-bottom: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.duel-form-group label {
+  font-family: var(--font-heading);
+  font-size: 0.8rem;
+  color: var(--cyan);
+  font-weight: 700;
+}
+
+.duel-form-row {
+  display: flex;
+  gap: 12px;
+}
+
+.duel-form-row .duel-form-group {
+  flex: 1;
+}
+
+.form-input, .form-select {
+  width: 100%;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--border-glass);
+  background: rgba(13, 15, 23, 0.8);
+  color: #fff;
+  font-size: 0.9rem;
+  outline: none;
+  font-family: var(--font-mono);
+}
+
+.form-input:focus, .form-select:focus {
+  border-color: var(--cyan);
+  box-shadow: var(--glow-cyan);
+}
+
