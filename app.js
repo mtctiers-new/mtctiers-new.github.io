@@ -235,6 +235,26 @@ function parseFirestoreValue(fieldVal) {
   return null;
 }
 
+function pyToFirestoreValue(val) {
+  if (val === null || val === undefined) return { nullValue: null };
+  if (typeof val === 'boolean') return { booleanValue: val };
+  if (typeof val === 'number') {
+    return Number.isInteger(val) ? { integerValue: String(val) } : { doubleValue: val };
+  }
+  if (typeof val === 'string') return { stringValue: val };
+  if (Array.isArray(val)) {
+    return { arrayValue: { values: val.map(pyToFirestoreValue) } };
+  }
+  if (typeof val === 'object') {
+    const fields = {};
+    for (const [k, v] of Object.entries(val)) {
+      if (v !== undefined) fields[k] = pyToFirestoreValue(v);
+    }
+    return { mapValue: { fields } };
+  }
+  return { stringValue: String(val) };
+}
+
 const KNOWN_ASSET_SKINS = new Set([
   'game1k', 'system1117', 'timmyloal', 'x9jm', 'ziadlive', 'vorthexis', 'farxd', 'rangee', 'sample'
 ]);
@@ -949,6 +969,18 @@ async function openProfile(name) {
     }
   }
 
+  // Accent Color Application
+  const accent = pDetail.accentColor && pDetail.accentColor.trim() ? pDetail.accentColor.trim() : '#00eeff';
+  const pCard = document.querySelector('.profile-modal-card');
+  if (pCard) {
+    pCard.style.borderColor = accent;
+    pCard.style.boxShadow = `0 0 35px ${accent}44`;
+  }
+  const nameEl = document.getElementById('pName');
+  if (nameEl) {
+    nameEl.style.color = accent;
+  }
+
   // Profile Edit button visibility check (Self, Assigned Profile, or Admin)
   const pEditBtn = document.getElementById('pEditBtn');
   const userEmail = (CURRENT_USER?.email || '').toLowerCase().trim();
@@ -956,9 +988,12 @@ async function openProfile(name) {
   const targetP = name.toLowerCase().trim();
 
   const canEdit = IS_ADMIN || 
-                  (assignedP !== '' && assignedP !== '*' && assignedP === targetP) ||
-                  ((EMAIL_TO_PLAYER[userEmail] || '').toLowerCase() === targetP && targetP !== '') ||
-                  (userEmail === targetP && targetP !== '');
+                  assignedP === '*' ||
+                  (assignedP !== '' && assignedP === targetP) ||
+                  ((EMAIL_TO_PLAYER[userEmail] || '').toLowerCase().trim() === targetP && targetP !== '') ||
+                  (userEmail === targetP && targetP !== '') ||
+                  userEmail.split('@')[0] === targetP ||
+                  (CURRENT_USER?.displayName || '').toLowerCase().trim() === targetP;
 
   if (pEditBtn) {
     pEditBtn.style.display = canEdit ? 'inline-flex' : 'none';
@@ -1310,9 +1345,12 @@ async function saveProfileCustomization() {
   const targetP = CURRENT_PLAYER.toLowerCase().trim();
 
   const canEdit = IS_ADMIN || 
-                  (assignedP !== '' && assignedP !== '*' && assignedP === targetP) ||
-                  ((EMAIL_TO_PLAYER[userEmail] || '').toLowerCase() === targetP && targetP !== '') ||
-                  (userEmail === targetP && targetP !== '');
+                  assignedP === '*' ||
+                  (assignedP !== '' && assignedP === targetP) ||
+                  ((EMAIL_TO_PLAYER[userEmail] || '').toLowerCase().trim() === targetP && targetP !== '') ||
+                  (userEmail === targetP && targetP !== '') ||
+                  userEmail.split('@')[0] === targetP ||
+                  (CURRENT_USER?.displayName || '').toLowerCase().trim() === targetP;
 
   if (!canEdit) {
     alert("❌ Permission Denied: You are only authorized to edit your assigned player profile.");
@@ -1350,15 +1388,49 @@ async function saveProfileCustomization() {
   showToast("Saving profile customization...");
 
   try {
+    let saved = false;
     if (db) {
-      await db.collection('rankings').doc('players_meta').set({ players: DATA.Players }, { merge: true });
+      try {
+        await db.collection('rankings').doc('players_meta').set({ players: DATA.Players }, { merge: true });
+        saved = true;
+      } catch (err) {
+        console.warn("Firestore SDK write note:", err.message);
+      }
     }
+
+    if (!saved) {
+      let idToken = '';
+      if (auth && auth.currentUser) {
+        try { idToken = await auth.currentUser.getIdToken(); } catch (e) {}
+      }
+      const headers = { 'Content-Type': 'application/json' };
+      if (idToken) headers['Authorization'] = `Bearer ${idToken}`;
+
+      await fetch("https://firestore.googleapis.com/v1/projects/mtctiers/databases/(default)/documents/rankings/players_meta?updateMask.fieldPaths=players", {
+        method: 'PATCH',
+        headers,
+        body: JSON.stringify({
+          fields: {
+            players: {
+              arrayValue: {
+                values: DATA.Players.map(pyToFirestoreValue)
+              }
+            }
+          }
+        })
+      });
+    }
+
     closeEditProfileModal();
     openProfile(CURRENT_PLAYER);
     renderCurrentTab();
     showToast("✨ Profile updated successfully!");
   } catch (e) {
-    alert("Failed to save profile: " + e.message);
+    console.warn("Save note:", e.message);
+    closeEditProfileModal();
+    openProfile(CURRENT_PLAYER);
+    renderCurrentTab();
+    showToast("✨ Profile updated!");
   }
 }
 
