@@ -620,8 +620,21 @@ async function renderTestersView() {
 }
 
 function duelPerspective(d, playerName) {
-  const isP1 = d.player1 === playerName;
-  const won = isP1 ? d.result === 'Won' : d.result === 'Lost';
+  const cleanTarget = (playerName || '').toLowerCase().trim();
+  const isP1 = (d.player1 || '').toLowerCase().trim() === cleanTarget;
+  const isP2 = (d.player2 || '').toLowerCase().trim() === cleanTarget;
+
+  let won = false;
+  if (d.winner && typeof d.winner === 'string') {
+    won = d.winner.toLowerCase().trim() === cleanTarget;
+  } else if (d.player1_score !== undefined && d.player2_score !== undefined) {
+    const s1 = parseInt(d.player1_score, 10) || 0;
+    const s2 = parseInt(d.player2_score, 10) || 0;
+    won = isP1 ? s1 > s2 : s2 > s1;
+  } else {
+    won = isP1 ? d.result === 'Won' : d.result === 'Lost';
+  }
+
   const myScore = isP1 ? d.player1_score : d.player2_score;
   const oppScore = isP1 ? d.player2_score : d.player1_score;
   const opponent = isP1 ? d.player2 : d.player1;
@@ -629,15 +642,25 @@ function duelPerspective(d, playerName) {
 }
 
 function duelDescLine(d, playerName) {
-  const kit = d.kit === 'Unknown' ? '' : d.kit;
-  const tier = d.tier === 'Unknown' ? '' : d.tier;
-  if (d.outcome && d.outcome !== 'tested') {
-    const subject = d.player1;
-    if (d.outcome === 'failed') {
+  if (d.note && typeof d.note === 'string' && d.note.trim()) {
+    return d.note.trim();
+  }
+  const kit = (!d.kit || d.kit === 'Unknown') ? '' : d.kit;
+  const tier = (!d.tier || d.tier === 'Unknown') ? '' : d.tier;
+  
+  if (d.outcome && typeof d.outcome === 'string') {
+    const oc = d.outcome.trim();
+    if (oc.includes('promoted') || oc.includes('demoted') || oc.includes('failed')) {
+      if (oc.includes(' ')) return oc;
+    }
+    const subject = d.player1 || playerName;
+    if (oc === 'failed') {
       return `${subject} failed${tier ? ' ' + tier : ''}${kit ? ' in ' + kit : ''}`;
     }
-    const verb = d.outcome === 'promoted' ? 'promoted to' : 'demoted to';
-    return `${subject} has been ${verb}${tier ? ' ' + tier : ''}${kit ? ' in ' + kit : ''}`;
+    const verb = oc === 'promoted' ? 'promoted' : oc === 'demoted' ? 'demoted' : oc;
+    const toTier = tier ? ` to ${tier}` : '';
+    const inKit = kit ? ` in ${kit}` : '';
+    return `${subject} has been ${verb}${toTier}${inKit}`;
   }
   return `${kit}${tier ? ' · ' + tier : ''}`.trim();
 }
@@ -645,7 +668,7 @@ function duelDescLine(d, playerName) {
 function openDuelPopup(d, perspective) {
   const p = perspective || d.player1;
   const info = duelPerspective(d, p);
-  const date = new Date(d.timestamp).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  const date = new Date(d.timestamp || d.created_at * 1000 || Date.now()).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   const oc = d.outcome || 'tested';
   const ocColor = oc === 'promoted' ? 'var(--emerald)' : oc === 'demoted' ? 'var(--crimson)' : oc === 'failed' ? '#ff8800' : 'var(--text-muted)';
 
@@ -684,84 +707,59 @@ function parseFirestoreMap(fields) {
 function dedupeAndSortDuels(duels) {
   const map = new Map();
   duels.forEach(d => {
-    const key = d.id || `${d.player1}_${d.player2}_${d.timestamp}`;
+    const key = d.id || d.message_id || `${d.player1}_${d.player2}_${d.timestamp || d.created_at}`;
     if (!map.has(key)) map.set(key, d);
   });
   const list = Array.from(map.values());
-  return list.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+  return list.sort((a, b) => new Date(b.timestamp || b.created_at * 1000 || 0) - new Date(a.timestamp || a.created_at * 1000 || 0));
 }
 
 async function fetchDuelsFromFirestore(playerFilter) {
-  const baseREST = "https://firestore.googleapis.com/v1/projects/mtctiers/databases/(default)/documents/duels";
-  
-  if (playerFilter) {
-    if (db) {
-      try {
-        const docRef = await db.collection('duels').doc(playerFilter).get();
-        if (docRef.exists) {
-          const data = docRef.data();
-          if (data.duels && Array.isArray(data.duels)) return data.duels;
-        }
-      } catch (e) { console.warn("Firestore SDK fetch note:", e.message); }
-    }
-    try {
-      const res = await fetch(`${baseREST}/${encodeURIComponent(playerFilter)}`);
-      if (res.ok) {
-        const docData = await res.json();
-        const rawDuels = docData.fields?.duels?.arrayValue?.values || [];
-        return rawDuels.map(item => parseFirestoreMap(item.mapValue?.fields || {}));
-      }
-    } catch (e) { console.warn("Firestore REST player fetch note:", e.message); }
-  } else {
-    if (db) {
-      try {
-        const snap = await db.collection('duels').get();
-        let allDuels = [];
-        snap.forEach(doc => {
-          const data = doc.data();
-          if (data.duels && Array.isArray(data.duels)) {
-            allDuels.push(...data.duels);
-          }
-        });
-        if (allDuels.length) return dedupeAndSortDuels(allDuels);
-      } catch (e) { console.warn("Firestore SDK all duels note:", e.message); }
-    }
-    try {
-      const res = await fetch(`${baseREST}?pageSize=300`);
-      if (res.ok) {
-        const data = await res.json();
-        const docs = data.documents || [];
-        let allDuels = [];
-        docs.forEach(doc => {
-          const rawDuels = doc.fields?.duels?.arrayValue?.values || [];
-          rawDuels.forEach(item => {
-            allDuels.push(parseFirestoreMap(item.mapValue?.fields || {}));
-          });
-        });
-        if (allDuels.length) return dedupeAndSortDuels(allDuels);
-      }
-    } catch (e) { console.warn("Firestore REST all duels note:", e.message); }
-  }
+  let allDuels = [];
 
+  // Load from local data/duels.json first (complete backup)
   try {
     const res = await fetch(`data/duels.json?v=${Date.now()}`);
     if (res.ok) {
       const localData = await res.json();
-      if (playerFilter) {
-        const pList = localData[playerFilter] || [];
-        return Array.isArray(pList) ? pList : (pList.duels || []);
-      } else {
-        let allDuels = [];
+      if (Array.isArray(localData)) allDuels.push(...localData);
+      else if (localData && Array.isArray(localData.duels)) allDuels.push(...localData.duels);
+      else if (typeof localData === 'object') {
         Object.values(localData).forEach(val => {
           if (Array.isArray(val)) allDuels.push(...val);
-          else if (val && val.duels) allDuels.push(...val.duels);
+          else if (val && Array.isArray(val.duels)) allDuels.push(...val.duels);
         });
-        if (allDuels.length) return dedupeAndSortDuels(allDuels);
       }
     }
   } catch (e) { console.warn("Local duels.json fetch note:", e.message); }
 
-  return [];
+  // Merge with Firestore live duels
+  try {
+    const baseREST = "https://firestore.googleapis.com/v1/projects/mtctiers/databases/(default)/documents/duels";
+    const res = await fetch(`${baseREST}?pageSize=300`);
+    if (res.ok) {
+      const data = await res.json();
+      const docs = data.documents || [];
+      docs.forEach(doc => {
+        const rawDuels = doc.fields?.duels?.arrayValue?.values || [];
+        rawDuels.forEach(item => {
+          allDuels.push(parseFirestoreMap(item.mapValue?.fields || {}));
+        });
+      });
+    }
+  } catch (e) { console.warn("Firestore REST duels note:", e.message); }
+
+  const combined = dedupeAndSortDuels(allDuels);
+
+  if (playerFilter) {
+    const cleanP = playerFilter.toLowerCase().trim();
+    return combined.filter(d => 
+      (d.player1 && d.player1.toLowerCase().trim() === cleanP) ||
+      (d.player2 && d.player2.toLowerCase().trim() === cleanP)
+    );
+  }
+
+  return combined;
 }
 
 async function renderDuelsView(playerFilter) {

@@ -54,22 +54,29 @@ client.once('ready', async () => {
   console.log(`🤖 MTCTiers Discord Bot Online! Logged in as ${client.user.tag}`);
   console.log(`================--------------------------------====`);
 
-  if (config.clientId && config.guildId) {
+  if (config.clientId) {
     try {
       const rest = new REST({ version: '10' }).setToken(config.token);
-      console.log(`Registering ${allCommands.length} slash commands to Guild ${config.guildId}...`);
+      console.log(`Registering ${allCommands.length} slash commands globally...`);
 
       await rest.put(
-        Routes.applicationGuildCommands(config.clientId, config.guildId),
+        Routes.applicationCommands(config.clientId),
         { body: allCommands.map(c => c.toJSON()) }
       );
+
+      if (config.guildId) {
+        await rest.put(
+          Routes.applicationGuildCommands(config.clientId, config.guildId),
+          { body: allCommands.map(c => c.toJSON()) }
+        );
+      }
 
       console.log(`✅ Successfully registered all ${allCommands.length} MTCTiers Slash Commands!`);
     } catch (err) {
       console.error(`❌ Failed to register slash commands:`, err);
     }
   } else {
-    console.warn(`⚠️ CLIENT_ID or GUILD_ID missing!`);
+    console.warn(`⚠️ CLIENT_ID missing!`);
   }
 
   try {
@@ -185,19 +192,28 @@ client.on('interactionCreate', async interaction => {
 
   if (!interaction.isChatInputCommand()) return;
 
-  const adminCmdNames = adminCommands.map(c => c.name);
-  if (adminCmdNames.includes(interaction.commandName)) {
-    return handleAdminCommand(interaction);
-  }
+  try {
+    const adminCmdNames = adminCommands.map(c => c.name);
+    if (adminCmdNames.includes(interaction.commandName)) {
+      return await handleAdminCommand(interaction);
+    }
 
-  const playerCmdNames = playerCommands.map(c => c.name);
-  if (playerCmdNames.includes(interaction.commandName)) {
-    return handlePlayerCommand(interaction);
-  }
+    const playerCmdNames = playerCommands.map(c => c.name);
+    if (playerCmdNames.includes(interaction.commandName)) {
+      return await handlePlayerCommand(interaction);
+    }
 
-  const queueCmdNames = queueCommands.map(c => c.name);
-  if (queueCmdNames.includes(interaction.commandName)) {
-    return handleQueueCommand(interaction);
+    const queueCmdNames = queueCommands.map(c => c.name);
+    if (queueCmdNames.includes(interaction.commandName)) {
+      return await handleQueueCommand(interaction);
+    }
+  } catch (err) {
+    console.error(`Error executing command ${interaction.commandName}:`, err);
+    if (interaction.deferred || interaction.replied) {
+      await interaction.editReply({ content: `❌ An unexpected error occurred while processing command \`/${interaction.commandName}\`: ${err.message}` }).catch(() => {});
+    } else {
+      await interaction.reply({ content: `❌ An unexpected error occurred while processing command \`/${interaction.commandName}\`: ${err.message}`, ephemeral: true }).catch(() => {});
+    }
   }
 });
 
