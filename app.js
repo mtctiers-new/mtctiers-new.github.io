@@ -342,6 +342,8 @@ async function loadRankingsData() {
               if (rawEntriesStr) {
                 try { WHITELIST_ENTRIES = JSON.parse(rawEntriesStr); } catch (e) {}
               }
+            } else if (['Overall', 'config', 'admin_guide', 'queue_state', 'all_data', 'main'].includes(docId)) {
+              // Exclude non-kit metadata documents
             } else {
               let parsedDoc = parseFirestoreMap(doc.fields || {});
               if (parsedDoc && parsedDoc.tiers && typeof parsedDoc.tiers === 'object') {
