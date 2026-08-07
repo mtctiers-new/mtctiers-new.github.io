@@ -323,35 +323,43 @@ function getPlayerMeta(name) {
 
 async function loadRankingsData() {
   try {
-    const res = await fetch(`data/rankings.json?v=${Date.now()}`);
-    DATA = await res.json();
+    let loadedFromFirestore = false;
 
+    // 1. Fetch directly from Firebase Firestore REST API (Primary Source of Truth)
     try {
-      const fsRes = await fetch("https://firestore.googleapis.com/v1/projects/mtctiers/databases/(default)/documents/rankings/players_meta");
+      const fsRes = await fetch("https://firestore.googleapis.com/v1/projects/mtctiers/databases/(default)/documents/rankings");
       if (fsRes.ok) {
-        const fsDoc = await fsRes.json();
-        const rawPlayers = fsDoc.fields?.players?.arrayValue?.values || [];
-        if (rawPlayers.length) {
-          const remotePlayers = rawPlayers.map(item => parseFirestoreMap(item.mapValue?.fields || {}));
-          
-          // Merge local & remote players safely
-          const playerMap = new Map();
-          (DATA.Players || []).forEach(p => {
-            const name = typeof p === 'object' ? p.name : p;
-            if (name) playerMap.set(name.toLowerCase(), typeof p === 'object' ? p : { name });
-          });
-          remotePlayers.forEach(p => {
-            if (p && p.name) {
-              const key = p.name.toLowerCase();
-              const existing = playerMap.get(key) || {};
-              playerMap.set(key, { ...existing, ...p });
+        const fsData = await fsRes.json();
+        const docs = fsData.documents || [];
+        if (docs.length) {
+          docs.forEach(doc => {
+            const docId = doc.name.split('/').pop();
+            if (docId === 'players_meta') {
+              const rawPlayers = doc.fields?.players?.arrayValue?.values || [];
+              DATA.Players = rawPlayers.map(item => parseFirestoreMap(item.mapValue?.fields || {}));
+            } else if (docId === 'whitelist') {
+              const rawEntriesStr = doc.fields?.entries?.stringValue;
+              if (rawEntriesStr) {
+                try { WHITELIST_ENTRIES = JSON.parse(rawEntriesStr); } catch (e) {}
+              }
+            } else {
+              const rawTiers = doc.fields?.tiers?.mapValue?.fields || doc.fields;
+              if (rawTiers) {
+                DATA[docId] = parseFirestoreMap(rawTiers);
+              }
             }
           });
-          DATA.Players = Array.from(playerMap.values());
+          loadedFromFirestore = true;
         }
       }
     } catch (e) {
-      console.warn("Firestore players_meta fetch note:", e.message);
+      console.warn("Direct Firestore REST load note:", e.message);
+    }
+
+    // 2. Fallback to local rankings.json only if offline/Firestore unreachable
+    if (!loadedFromFirestore) {
+      const res = await fetch(`data/rankings.json?v=${Date.now()}`);
+      DATA = await res.json();
     }
 
     computeOverallPoints();
@@ -1445,7 +1453,7 @@ async function saveProfileCustomization() {
       const headers = { 'Content-Type': 'application/json' };
       if (idToken) headers['Authorization'] = `Bearer ${idToken}`;
 
-      await fetch("https://firestore.googleapis.com/v1/projects/mtctiers/databases/(default)/documents/rankings/players_meta?updateMask.fieldPaths=players", {
+      const patchRes = await fetch("https://firestore.googleapis.com/v1/projects/mtctiers/databases/(default)/documents/rankings/players_meta?updateMask.fieldPaths=players", {
         method: 'PATCH',
         headers,
         body: JSON.stringify({
@@ -1458,18 +1466,19 @@ async function saveProfileCustomization() {
           }
         })
       });
+
+      if (!patchRes.ok) {
+        const errJson = await patchRes.json().catch(() => ({}));
+        throw new Error(errJson.error?.message || `HTTP ${patchRes.status} Error`);
+      }
     }
 
     closeEditProfileModal();
     openProfile(CURRENT_PLAYER);
     renderCurrentTab();
-    showToast("✨ Profile updated successfully!");
+    showToast("✨ Profile updated successfully on Firebase!");
   } catch (e) {
-    console.warn("Save note:", e.message);
-    closeEditProfileModal();
-    openProfile(CURRENT_PLAYER);
-    renderCurrentTab();
-    showToast("✨ Profile updated!");
+    alert("❌ Failed to save profile to Firebase database: " + e.message);
   }
 }
 
