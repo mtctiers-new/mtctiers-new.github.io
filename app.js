@@ -321,6 +321,27 @@ function getPlayerMeta(name) {
   return (DATA.Players || []).find(p => (typeof p === 'object' ? p.name : p).toLowerCase().trim() === clean) || {};
 }
 
+function getPlayersInTier(tierData) {
+  if (!tierData) return [];
+  if (Array.isArray(tierData)) return tierData.map(p => (typeof p === 'object' ? p.name : p)).filter(Boolean);
+  if (typeof tierData === 'object') {
+    return Object.values(tierData).map(p => (typeof p === 'object' ? p.name : p)).filter(Boolean);
+  }
+  if (typeof tierData === 'string') return [tierData];
+  return [];
+}
+
+function normalizeDataKits(dataObj) {
+  if (!dataObj || typeof dataObj !== 'object') return dataObj;
+  for (let kit in dataObj) {
+    if (kit === 'Overall' || kit === 'Players' || kit === 'whitelist') continue;
+    if (dataObj[kit] && dataObj[kit].tiers && typeof dataObj[kit].tiers === 'object') {
+      dataObj[kit] = dataObj[kit].tiers;
+    }
+  }
+  return dataObj;
+}
+
 async function loadRankingsData() {
   try {
     let loadedFromFirestore = false;
@@ -365,6 +386,7 @@ async function loadRankingsData() {
       DATA = await res.json();
     }
 
+    normalizeDataKits(DATA);
     computeOverallPoints();
     renderCurrentTab();
   } catch (err) {
@@ -385,14 +407,13 @@ function computeOverallPoints() {
     for (let tier in DATA[kit]) {
       const cleanTier = tier.replace(/^R/, '').trim();
       const points = PTS_POINTS[cleanTier] || 0;
-      if (Array.isArray(DATA[kit][tier])) {
-        DATA[kit][tier].forEach(p => {
-          const name = typeof p === 'object' ? p.name : (p || '').toString().trim();
-          if (name) {
-            DATA.Overall[name] = (DATA.Overall[name] || 0) + points;
-          }
-        });
-      }
+      const players = getPlayersInTier(DATA[kit][tier]);
+      players.forEach(p => {
+        const name = (p || '').toString().trim();
+        if (name) {
+          DATA.Overall[name] = (DATA.Overall[name] || 0) + points;
+        }
+      });
     }
   }
 }
@@ -565,7 +586,8 @@ function getKitVerticalTierHtml(kitName) {
     if (retiredFilter === 'active' && isRetired) return;
     if (retiredFilter === 'retired' && !isRetired) return;
 
-    const visiblePlayers = kitData[tier].filter(player => filterPlayerVisible(player));
+    const rawPlayers = getPlayersInTier(kitData[tier]);
+    const visiblePlayers = rawPlayers.filter(player => filterPlayerVisible(player));
     if (!visiblePlayers.length) return;
 
     totalCount += visiblePlayers.length;
