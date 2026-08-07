@@ -5,7 +5,7 @@ const TARGET_RESULTS_CHANNEL = '1484010943657803976';
 const LOGO_URL = 'https://raw.githubusercontent.com/mtctiers-new/mtctiers-new.github.io/main/assets/mtctiers.png';
 
 const KITS = ['Emerald KB', 'Dragonhide KB', 'Dragonhide Anchor', 'Novelty Axe', 'Emerald', 'Manhunt', 'Diamond', 'Void'];
-const DUMMY_NAMES = ['playerign', 'opponentign', 'username', 'testuser', 'playername'];
+const DUMMY_NAMES = ['playerign', 'opponentign', 'username', 'testuser', 'playername', 'been', 'has', 'was', 'is', 'the', 'and', 'this', 'that', 'with', 'from'];
 
 function parseManualResultText(text) {
   if (!text || typeof text !== 'string') return null;
@@ -26,8 +26,8 @@ function parseManualResultText(text) {
     }
   }
 
-  // Tested player & action & tier
-  const actionRegex = /(?:@\S+\s*-\s*)?([a-zA-Z0-9_-]{2,20})\s+(failed|has been promoted to|promoted to|promoted|has been demoted to|demoted to|demoted)\s+([A-Z0-9]{2,5})/i;
+  // Tested player & action & tier (strictly requires HT1-5, LT1-5, RHT1-5, RLT1-5)
+  const actionRegex = /(?:@\S+\s*-\s*)?([a-zA-Z0-9_-]{2,20})\s+(failed|has been promoted to|promoted to|promoted|has been demoted to|demoted to|demoted)\s+([R]?[HL]T[1-5])/i;
   const mAction = text.match(actionRegex);
 
   if (!mAction) return null;
