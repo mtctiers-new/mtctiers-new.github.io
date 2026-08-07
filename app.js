@@ -1229,27 +1229,136 @@ function closeProfileModal() {
   }
 }
 
+const DUELS_REGISTRY = new Map();
+
+function copyDuelLink(duelId, playerName) {
+  const baseUrl = window.location.origin + window.location.pathname;
+  let shareUrl = `${baseUrl}?tab=duels&duel=${encodeURIComponent(duelId)}`;
+  if (playerName) {
+    shareUrl += `&player=${encodeURIComponent(playerName)}`;
+  }
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(shareUrl).then(() => {
+      showToast(`🔗 Copied direct link for Duel #${duelId}!`);
+    }).catch(() => {
+      prompt("Copy direct duel link:", shareUrl);
+    });
+  } else {
+    prompt("Copy direct duel link:", shareUrl);
+  }
+}
+
+function openDuelPopupById(duelId, perspective) {
+  let duel = DUELS_REGISTRY.get(String(duelId));
+  if (!duel) {
+    for (const [k, v] of DUELS_REGISTRY.entries()) {
+      if (String(v.id || v.timestamp || v.message_id) === String(duelId)) {
+        duel = v;
+        break;
+      }
+    }
+  }
+  if (duel) {
+    openDuelPopup(duel, perspective);
+  } else {
+    showToast(`⚠️ Duel #${duelId} not found in current cache.`);
+  }
+}
+
+function openDuelPopup(duel, perspective) {
+  const p = perspective || duel.player1;
+  const info = duelPerspective(duel, p);
+  const dateStr = new Date(duel.timestamp || duel.created_at * 1000 || Date.now()).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  const duelId = String(duel.id || duel.timestamp || duel.message_id || 'N/A');
+
+  let modal = document.getElementById('duelPopupModalOverlay');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'duelPopupModalOverlay';
+    modal.className = 'modal-overlay';
+    modal.onclick = (e) => { if (e.target.id === 'duelPopupModalOverlay') modal.classList.remove('active'); };
+    document.body.appendChild(modal);
+  }
+
+  modal.innerHTML = `
+    <div class="modal-card duel-popup-card" style="max-width:480px;border-color:var(--cyan);box-shadow:0 0 35px rgba(0,238,255,0.35);background:rgba(10,20,35,0.95);backdrop-filter:blur(16px);border-radius:20px;padding:24px;position:relative;">
+      <button class="modal-close-btn" style="position:absolute;top:16px;right:16px;background:none;border:none;color:#aaa;font-size:1.5rem;cursor:pointer;" onclick="closeDuelPopup()">&times;</button>
+      <div style="font-family:var(--font-heading);font-weight:900;font-size:1.3rem;color:var(--cyan);margin-bottom:4px;display:flex;align-items:center;justify-content:space-between;">
+        <span>⚔️ DUEL DETAILS</span>
+        <span style="font-size:0.8rem;color:var(--text-muted);font-weight:600;">ID: #${duelId}</span>
+      </div>
+      <div style="font-family:var(--font-heading);font-size:0.85rem;color:var(--text-muted);margin-bottom:16px;">${dateStr}</div>
+
+      <div style="background:rgba(255,255,255,0.04);border:1px solid var(--border-color);border-radius:14px;padding:18px;margin-bottom:16px;text-align:center;">
+        <div style="font-family:var(--font-heading);font-size:1.2rem;font-weight:800;color:#fff;margin-bottom:8px;">
+          <span style="color:var(--cyan);cursor:pointer;" onclick="closeDuelPopup();openProfile('${p}')">${p}</span>
+          <span style="color:var(--text-muted);font-size:0.85rem;margin:0 8px;">VS</span>
+          <span style="color:#fff;cursor:pointer;" onclick="closeDuelPopup();openProfile('${info.opponent}')">${info.opponent}</span>
+        </div>
+        <div style="font-family:var(--font-heading);font-size:2.4rem;font-weight:900;letter-spacing:1px;color:${info.won ? 'var(--emerald)' : 'var(--crimson)'};">
+          ${info.myScore} - ${info.oppScore}
+        </div>
+        <div style="font-family:var(--font-heading);font-size:0.9rem;font-weight:700;color:var(--gold);margin-top:6px;">
+          🏆 Winner: ${duel.winner || (info.won ? p : info.opponent)}
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;font-family:var(--font-heading);font-size:0.85rem;">
+        <div style="background:rgba(0,0,0,0.25);padding:10px 14px;border-radius:10px;border:1px solid var(--border-color);">
+          <span style="color:var(--text-muted);display:block;font-size:0.75rem;">KIT CATEGORY</span>
+          <span style="color:#fff;font-weight:700;">${duel.kit || 'N/A'}</span>
+        </div>
+        <div style="background:rgba(0,0,0,0.25);padding:10px 14px;border-radius:10px;border:1px solid var(--border-color);">
+          <span style="color:var(--text-muted);display:block;font-size:0.75rem;">OUTCOME / TYPE</span>
+          <span style="color:#fff;font-weight:700;">${duel.outcome || duel.tier || 'Rank Match'}</span>
+        </div>
+      </div>
+
+      ${duel.note ? `
+        <div style="background:rgba(0,238,255,0.06);border:1px dashed rgba(0,238,255,0.3);border-radius:10px;padding:12px;margin-bottom:16px;font-size:0.85rem;color:#ddd;line-height:1.4;">
+          💬 <strong>Notes:</strong> ${escapeHTML(duel.note)}
+        </div>
+      ` : ''}
+
+      <div style="display:flex;gap:10px;">
+        <button class="btn btn-secondary" style="flex:1;padding:10px 16px;" onclick="copyDuelLink('${duelId}', '${p}')">🔗 Copy Direct Link</button>
+        <button class="btn btn-primary" style="flex:1;padding:10px 16px;" onclick="closeDuelPopup()">Close</button>
+      </div>
+    </div>
+  `;
+
+  if (window.history && window.history.replaceState) {
+    window.history.replaceState(null, '', `?tab=duels&player=${encodeURIComponent(p)}&duel=${encodeURIComponent(duelId)}`);
+  }
+
+  modal.classList.add('active');
+}
+
+function closeDuelPopup() {
+  const modal = document.getElementById('duelPopupModalOverlay');
+  if (modal) modal.classList.remove('active');
+}
+
 function closeModalOnBackdrop(e) {
   if (e.target.id === 'profileModalOverlay') {
     closeProfileModal();
   }
 }
 
-function handleUrlParamsOnLoad() {
+async function handleUrlParamsOnLoad() {
   const search = window.location.search;
   const hash = window.location.hash;
   let targetPlayer = null;
+  let targetDuelId = null;
+  let targetTab = null;
 
   if (search) {
     const params = new URLSearchParams(search);
     if (params.has('player')) targetPlayer = params.get('player');
     else if (params.has('p')) targetPlayer = params.get('p');
-    else {
-      const rawQuery = search.substring(1).trim();
-      if (rawQuery && !rawQuery.includes('=')) {
-        targetPlayer = rawQuery;
-      }
-    }
+    if (params.has('duel')) targetDuelId = params.get('duel');
+    else if (params.has('d')) targetDuelId = params.get('d');
+    if (params.has('tab')) targetTab = params.get('tab');
   }
 
   if (!targetPlayer && hash) {
@@ -1258,13 +1367,27 @@ function handleUrlParamsOnLoad() {
     else if (!rawHash.includes('=')) targetPlayer = rawHash;
   }
 
-  if (targetPlayer) {
+  if (targetTab === 'duels') {
+    switchTab('duels');
+    await renderDuelsView(targetPlayer);
+  } else if (targetPlayer) {
     const cleanName = decodeURIComponent(targetPlayer).replace(/\+/g, ' ').trim();
     if (cleanName) {
       setTimeout(() => {
         openProfile(cleanName);
       }, 200);
     }
+  }
+
+  if (targetDuelId) {
+    setTimeout(async () => {
+      const duels = await fetchDuelsFromFirestore(targetPlayer);
+      duels.forEach(d => {
+        const dKey = String(d.id || d.timestamp || d.message_id);
+        DUELS_REGISTRY.set(dKey, d);
+      });
+      openDuelPopupById(targetDuelId, targetPlayer);
+    }, 400);
   }
 }
 
