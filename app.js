@@ -741,6 +741,14 @@ function duelDescLine(d, playerName) {
   return `${kit}${tier ? ' · ' + tier : ''}`.trim();
 }
 
+let DUELS_REGISTRY = new Map();
+
+function openDuelPopupById(id, perspective) {
+  const d = DUELS_REGISTRY.get(String(id));
+  if (!d) return;
+  openDuelPopup(d, perspective);
+}
+
 function openDuelPopup(d, perspective) {
   const p = perspective || d.player1;
   const info = duelPerspective(d, p);
@@ -870,15 +878,18 @@ async function renderDuelsView(playerFilter) {
       <div class="duel-list">
     `;
 
+    DUELS_REGISTRY.clear();
     duels.forEach((d, i) => {
+      const duelId = String(d.id || d.message_id || `d_${i}`);
+      DUELS_REGISTRY.set(duelId, d);
+
       const perspective = playerFilter || d.player1;
       const info = duelPerspective(d, perspective);
-      const date = new Date(d.timestamp).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+      const date = new Date(d.timestamp || d.created_at * 1000 || Date.now()).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
       const desc = duelDescLine(d, perspective);
-      const jsonStr = JSON.stringify(d).replace(/'/g, "&apos;").replace(/"/g, "&quot;");
 
       html += `
-        <div class="duel-row ${info.won ? 'won' : 'lost'}" onclick="openDuelPopup(${jsonStr}, '${perspective}')">
+        <div class="duel-row ${info.won ? 'won' : 'lost'}" onclick="openDuelPopupById('${duelId}', '${perspective}')">
           <div class="duel-row-top">
             <div class="duel-names">
               <span class="duel-p1" onclick="event.stopPropagation();openProfile('${perspective}')">${perspective}</span>
@@ -936,10 +947,12 @@ async function renderProfileDuels(playerName) {
     if (!metaBox || !duels || !duels.length) return;
 
     const d = duels[0];
+    const duelId = String(d.id || d.message_id || `latest_${playerName}`);
+    DUELS_REGISTRY.set(duelId, d);
+
     const info = duelPerspective(d, playerName);
-    const date = new Date(d.timestamp).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    const date = new Date(d.timestamp || d.created_at * 1000 || Date.now()).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
     const desc = duelDescLine(d, playerName);
-    const jsonStr = JSON.stringify(d).replace(/'/g, "&apos;").replace(/"/g, "&quot;");
 
     const section = document.createElement('div');
     section.className = 'profile-duel-section';
@@ -948,7 +961,7 @@ async function renderProfileDuels(playerName) {
         <span class="profile-duel-label-text">LATEST DUEL</span>
         <span class="profile-duel-viewall" onclick="closeProfileModal();switchTab('duels');renderDuelsView('${playerName}')">VIEW ALL ▶</span>
       </div>
-      <div class="profile-duel-card" onclick="openDuelPopup(${jsonStr}, '${playerName}')">
+      <div class="profile-duel-card" onclick="openDuelPopupById('${duelId}', '${playerName}')">
         <div class="profile-duel-top">
           <div class="profile-duel-names">${playerName} <span>vs</span> ${info.opponent}</div>
           <div class="profile-duel-score-text" style="color: ${info.won ? 'var(--emerald)' : 'var(--crimson)'};">${info.myScore}-${info.oppScore}</div>
