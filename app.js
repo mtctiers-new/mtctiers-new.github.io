@@ -568,14 +568,56 @@ function renderOverallLeaderboard() {
   displayList.innerHTML = tableHtml;
 }
 
+function isPlayerActive(name) {
+  const cleanName = (name || '').toLowerCase().trim();
+  for (let k in DATA) {
+    if (k === 'Overall' || k === 'Players' || k === 'whitelist') continue;
+    if (!DATA[k] || typeof DATA[k] !== 'object') continue;
+    for (let t in DATA[k]) {
+      if (!t.startsWith('R') && isPlayerInTier(DATA[k][t], cleanName)) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+function isPlayerRetired(name) {
+  const cleanName = (name || '').toLowerCase().trim();
+  let hasTiers = false;
+  let hasActive = false;
+  for (let k in DATA) {
+    if (k === 'Overall' || k === 'Players' || k === 'whitelist') continue;
+    if (!DATA[k] || typeof DATA[k] !== 'object') continue;
+    for (let t in DATA[k]) {
+      if (isPlayerInTier(DATA[k][t], cleanName)) {
+        hasTiers = true;
+        if (!t.startsWith('R')) hasActive = true;
+      }
+    }
+  }
+  return hasTiers && !hasActive;
+}
+
 function filterPlayerVisible(playerName) {
   const regionFilter = document.getElementById('filterRegion') ? document.getElementById('filterRegion').value : '';
   const deviceFilter = document.getElementById('filterDevice') ? document.getElementById('filterDevice').value : '';
+  const retiredFilter = document.getElementById('filterRetired') ? document.getElementById('filterRetired').value : 'all';
 
-  const playerMeta = (DATA.Players || []).find(p => p.name === playerName) || {};
+  const playerMeta = getPlayerMeta(playerName);
 
-  if (regionFilter && playerMeta.region !== regionFilter) return false;
-  if (deviceFilter && playerMeta.device !== deviceFilter) return false;
+  if (regionFilter && (playerMeta.region || '').toUpperCase() !== regionFilter.toUpperCase()) {
+    return false;
+  }
+  if (deviceFilter && (playerMeta.device || '').toUpperCase() !== deviceFilter.toUpperCase()) {
+    return false;
+  }
+
+  if (retiredFilter === 'active') {
+    if (!isPlayerActive(playerName)) return false;
+  } else if (retiredFilter === 'retired') {
+    if (!isPlayerRetired(playerName)) return false;
+  }
 
   return true;
 }
@@ -588,7 +630,7 @@ function resetFilters() {
   if (document.getElementById('filterRegion')) document.getElementById('filterRegion').value = '';
   if (document.getElementById('filterDevice')) document.getElementById('filterDevice').value = '';
   if (document.getElementById('filterRetired')) document.getElementById('filterRetired').value = 'all';
-  applyFilters();
+  renderCurrentTab();
 }
 
 function getKitVerticalTierHtml(kitName) {
@@ -1364,30 +1406,7 @@ function getPlayerKitBadges(name) {
   return html;
 }
 
-function filterPlayerVisible(name) {
-  const regionEl = document.getElementById('filterRegion');
-  const deviceEl = document.getElementById('filterDevice');
-  const region = regionEl ? regionEl.value : '';
-  const device = deviceEl ? deviceEl.value : '';
 
-  const pDetail = getPlayerMeta(name);
-
-  if (region && pDetail.region !== region) return false;
-  if (device && pDetail.device !== device) return false;
-
-  return true;
-}
-
-function applyFilters() {
-  renderCurrentTab();
-}
-
-function resetFilters() {
-  document.getElementById('filterRegion').value = '';
-  document.getElementById('filterDevice').value = '';
-  document.getElementById('filterRetired').value = 'active';
-  renderCurrentTab();
-}
 
 function openSubmitDuelModal() {
   if (!IS_ADMIN) return alert("Whitelisted staff admin access required.");
