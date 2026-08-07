@@ -800,16 +800,32 @@ function closeDuelPopup() {
 }
 
 function parseFirestoreMap(fields) {
+  if (!fields || typeof fields !== 'object') return {};
   const d = {};
   for (let k in fields) {
     const valObj = fields[k];
+    if (!valObj || typeof valObj !== 'object') continue;
+
     if (valObj.stringValue !== undefined) d[k] = valObj.stringValue;
     else if (valObj.integerValue !== undefined) d[k] = parseInt(valObj.integerValue, 10);
     else if (valObj.booleanValue !== undefined) d[k] = valObj.booleanValue;
+    else if (valObj.arrayValue !== undefined) {
+      d[k] = (valObj.arrayValue.values || []).map(item => parseFirestoreMapVal(item));
+    }
     else if (valObj.mapValue !== undefined) d[k] = parseFirestoreMap(valObj.mapValue.fields || {});
     else d[k] = Object.values(valObj)[0];
   }
   return d;
+}
+
+function parseFirestoreMapVal(item) {
+  if (!item || typeof item !== 'object') return item;
+  if (item.stringValue !== undefined) return item.stringValue;
+  if (item.integerValue !== undefined) return parseInt(item.integerValue, 10);
+  if (item.booleanValue !== undefined) return item.booleanValue;
+  if (item.mapValue) return parseFirestoreMap(item.mapValue.fields || {});
+  if (item.arrayValue) return (item.arrayValue.values || []).map(parseFirestoreMapVal);
+  return Object.values(item)[0];
 }
 
 function dedupeAndSortDuels(duels) {
