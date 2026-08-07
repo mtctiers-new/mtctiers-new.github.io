@@ -343,10 +343,11 @@ async function loadRankingsData() {
                 try { WHITELIST_ENTRIES = JSON.parse(rawEntriesStr); } catch (e) {}
               }
             } else {
-              const rawTiers = doc.fields?.tiers?.mapValue?.fields || doc.fields;
-              if (rawTiers) {
-                DATA[docId] = parseFirestoreMap(rawTiers);
+              let parsedDoc = parseFirestoreMap(doc.fields || {});
+              if (parsedDoc && parsedDoc.tiers && typeof parsedDoc.tiers === 'object') {
+                parsedDoc = parsedDoc.tiers;
               }
+              DATA[docId] = parsedDoc;
             }
           });
           loadedFromFirestore = true;
@@ -402,22 +403,26 @@ function switchTab(tab) {
 
   const kitBar = document.getElementById('kitBar');
   const filterBar = document.getElementById('filterBar');
+  const podiumWrap = document.getElementById('podiumWrap');
 
   if (tab === 'home') {
     CURRENT_KIT = 'Overall';
     updateKitBarActive('Overall');
-    kitBar.style.display = 'flex';
-    filterBar.style.display = 'flex';
+    if (kitBar) kitBar.style.display = 'flex';
+    if (filterBar) filterBar.style.display = 'flex';
+    if (podiumWrap) podiumWrap.style.display = 'flex';
   } else if (tab === 'rankings') {
     if (CURRENT_KIT === 'Overall') {
-      CURRENT_KIT = 'Emerald'; // Default to first kit when clicking KITS nav tab
+      CURRENT_KIT = 'Emerald';
     }
     updateKitBarActive(CURRENT_KIT);
-    kitBar.style.display = 'flex';
-    filterBar.style.display = 'flex';
+    if (kitBar) kitBar.style.display = 'flex';
+    if (filterBar) filterBar.style.display = 'flex';
+    if (podiumWrap) { podiumWrap.style.display = 'none'; podiumWrap.innerHTML = ''; }
   } else {
-    kitBar.style.display = 'none';
-    filterBar.style.display = 'none';
+    if (kitBar) kitBar.style.display = 'none';
+    if (filterBar) filterBar.style.display = 'none';
+    if (podiumWrap) { podiumWrap.style.display = 'none'; podiumWrap.innerHTML = ''; }
   }
 
   renderCurrentTab();
@@ -435,23 +440,26 @@ function renderCurrentTab() {
 
   if (CURRENT_TAB === 'home' || CURRENT_TAB === 'rankings') {
     if (CURRENT_KIT === 'Overall') {
+      if (podiumWrap) podiumWrap.style.display = 'flex';
       renderOverallLeaderboard();
     } else if (CURRENT_KIT === 'All Kits') {
+      if (podiumWrap) { podiumWrap.style.display = 'none'; podiumWrap.innerHTML = ''; }
       renderAllKitsVerticalView();
     } else {
+      if (podiumWrap) { podiumWrap.style.display = 'none'; podiumWrap.innerHTML = ''; }
       renderKitView(CURRENT_KIT);
     }
   } else if (CURRENT_TAB === 'rules') {
-    podiumWrap.innerHTML = '';
+    if (podiumWrap) { podiumWrap.style.display = 'none'; podiumWrap.innerHTML = ''; }
     renderRulesView();
   } else if (CURRENT_TAB === 'hof') {
-    podiumWrap.innerHTML = '';
+    if (podiumWrap) { podiumWrap.style.display = 'none'; podiumWrap.innerHTML = ''; }
     renderHofView();
   } else if (CURRENT_TAB === 'testers') {
-    podiumWrap.innerHTML = '';
+    if (podiumWrap) { podiumWrap.style.display = 'none'; podiumWrap.innerHTML = ''; }
     renderTestersView();
   } else if (CURRENT_TAB === 'duels') {
-    podiumWrap.innerHTML = '';
+    if (podiumWrap) { podiumWrap.style.display = 'none'; podiumWrap.innerHTML = ''; }
     renderDuelsView();
   }
 }
