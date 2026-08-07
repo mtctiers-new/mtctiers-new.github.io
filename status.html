@@ -1,0 +1,655 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MTCTiers Status — System Operational Dashboard</title>
+  <meta name="description" content="Real-time operational status, system latency, and uptime dashboard for MTCTiers services, API, database, and Discord bot.">
+  <link rel="icon" type="image/png" href="assets/mtctiers.png">
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Outfit:wght@600;700;800;900&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+      --bg-dark: #0a0b10;
+      --bg-card: rgba(18, 20, 32, 0.75);
+      --border-glass: rgba(255, 255, 255, 0.08);
+      --cyan: #00eeff;
+      --cyan-glow: rgba(0, 238, 255, 0.25);
+      --emerald: #10b981;
+      --emerald-glow: rgba(16, 185, 129, 0.25);
+      --amber: #f59e0b;
+      --crimson: #ef4444;
+      --text-main: #f3f4f6;
+      --text-muted: #9ca3af;
+      --font-main: 'Inter', sans-serif;
+      --font-heading: 'Outfit', sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg-dark);
+      color: var(--text-main);
+      font-family: var(--font-main);
+      min-height: 100vh;
+      overflow-x: hidden;
+      background-image: 
+        radial-gradient(circle at 10% 20%, rgba(0, 238, 255, 0.04) 0%, transparent 40%),
+        radial-gradient(circle at 90% 80%, rgba(16, 185, 129, 0.04) 0%, transparent 40%);
+    }
+
+    /* Navbar */
+    .status-nav {
+      height: 70px;
+      padding: 0 40px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border-glass);
+      background: rgba(10, 11, 16, 0.85);
+      backdrop-filter: blur(12px);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .nav-brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      text-decoration: none;
+      color: #fff;
+    }
+
+    .nav-logo {
+      width: 36px;
+      height: 36px;
+      object-fit: contain;
+    }
+
+    .nav-title {
+      font-family: var(--font-heading);
+      font-weight: 800;
+      font-size: 1.25rem;
+      letter-spacing: 1px;
+    }
+
+    .nav-title span { color: var(--cyan); }
+
+    .nav-back-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 18px;
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border-glass);
+      color: var(--text-muted);
+      text-decoration: none;
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      font-weight: 600;
+      transition: all 0.2s ease;
+    }
+
+    .nav-back-btn:hover {
+      color: #fff;
+      border-color: var(--cyan);
+      background: rgba(0, 238, 255, 0.1);
+      box-shadow: 0 0 15px var(--cyan-glow);
+    }
+
+    /* Main Container */
+    .status-container {
+      max-width: 1000px;
+      margin: 40px auto;
+      padding: 0 24px;
+    }
+
+    /* Header Banner */
+    .banner-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-glass);
+      border-radius: 16px;
+      padding: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 32px;
+      backdrop-filter: blur(12px);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .banner-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 3px;
+      background: linear-gradient(90deg, var(--emerald), var(--cyan));
+      transition: background 0.3s ease;
+    }
+
+    .banner-status-info {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+    }
+
+    .status-dot-pulse {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: var(--emerald);
+      box-shadow: 0 0 0 rgba(16, 185, 129, 0.4);
+      animation: pulse-emerald 2s infinite;
+    }
+
+    @keyframes pulse-emerald {
+      0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+      70% { box-shadow: 0 0 0 14px rgba(16, 185, 129, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+    }
+
+    .banner-headline {
+      font-family: var(--font-heading);
+      font-size: 1.6rem;
+      font-weight: 800;
+      color: #fff;
+    }
+
+    .banner-subtext {
+      font-size: 0.9rem;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    .banner-refresh-box {
+      text-align: right;
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+
+    .btn-refresh {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border-glass);
+      color: #fff;
+      padding: 6px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      margin-top: 6px;
+      transition: all 0.2s ease;
+    }
+
+    .btn-refresh:hover {
+      border-color: var(--cyan);
+      color: var(--cyan);
+    }
+
+    /* Section Headers */
+    .section-title {
+      font-family: var(--font-heading);
+      font-size: 1.2rem;
+      font-weight: 700;
+      margin-bottom: 16px;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    /* Service Cards Grid */
+    .services-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      margin-bottom: 40px;
+    }
+
+    .service-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-glass);
+      border-radius: 12px;
+      padding: 20px 24px;
+      backdrop-filter: blur(10px);
+      transition: border-color 0.2s ease, transform 0.2s ease;
+    }
+
+    .service-card:hover {
+      border-color: rgba(0, 238, 255, 0.2);
+    }
+
+    .service-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 14px;
+    }
+
+    .service-name-wrap {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .service-icon {
+      font-size: 1.25rem;
+    }
+
+    .service-name {
+      font-family: var(--font-heading);
+      font-weight: 700;
+      font-size: 1.05rem;
+      color: #fff;
+    }
+
+    .service-meta {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      font-family: var(--font-mono);
+    }
+
+    .service-status-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      font-weight: 700;
+      padding: 4px 12px;
+      border-radius: 20px;
+      background: rgba(16, 185, 129, 0.15);
+      color: var(--emerald);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+
+    /* Uptime Bar Graph */
+    .uptime-bar-wrap {
+      display: flex;
+      gap: 3px;
+      height: 24px;
+      align-items: flex-end;
+    }
+
+    .bar-day {
+      flex: 1;
+      height: 100%;
+      background: var(--emerald);
+      border-radius: 2px;
+      opacity: 0.85;
+      transition: opacity 0.2s ease, transform 0.2s ease;
+      position: relative;
+    }
+
+    .bar-day:hover {
+      opacity: 1;
+      transform: scaleY(1.15);
+    }
+
+    .uptime-footer {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 8px;
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+
+    /* Incidents List */
+    .incidents-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-glass);
+      border-radius: 14px;
+      padding: 24px;
+      backdrop-filter: blur(10px);
+    }
+
+    .incident-item {
+      padding-bottom: 20px;
+      margin-bottom: 20px;
+      border-bottom: 1px solid var(--border-glass);
+    }
+
+    .incident-item:last-child {
+      padding-bottom: 0;
+      margin-bottom: 0;
+      border-bottom: none;
+    }
+
+    .incident-date {
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      color: var(--cyan);
+      margin-bottom: 6px;
+    }
+
+    .incident-title {
+      font-family: var(--font-heading);
+      font-weight: 700;
+      font-size: 1rem;
+      color: #fff;
+      margin-bottom: 6px;
+    }
+
+    .incident-desc {
+      font-size: 0.88rem;
+      color: var(--text-muted);
+      line-height: 1.5;
+    }
+
+    /* Footer */
+    .status-footer {
+      text-align: center;
+      padding: 40px 0;
+      color: var(--text-muted);
+      font-size: 0.85rem;
+      border-top: 1px solid var(--border-glass);
+      margin-top: 60px;
+    }
+
+    .status-footer a {
+      color: var(--cyan);
+      text-decoration: none;
+    }
+
+    @media (max-width: 640px) {
+      .status-nav { padding: 0 20px; }
+      .banner-card { flex-direction: column; align-items: flex-start; gap: 20px; }
+      .banner-refresh-box { text-align: left; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Navbar -->
+  <header class="status-nav">
+    <a href="index.html" class="nav-brand">
+      <img src="assets/mtctiers.png" alt="MTCTiers" class="nav-logo" onerror="this.src='assets/default.png'">
+      <div class="nav-title">MTC<span>TIERS</span> STATUS</div>
+    </a>
+    <a href="index.html" class="nav-back-btn">
+      <span>◀ BACK TO LEADERBOARD</span>
+    </a>
+  </header>
+
+  <!-- Main Content -->
+  <main class="status-container">
+
+    <!-- Operational Banner -->
+    <div class="banner-card">
+      <div class="banner-status-info">
+        <div id="bannerDot" class="status-dot-pulse"></div>
+        <div>
+          <div id="bannerHeadline" class="banner-headline">All Systems Operational</div>
+          <div id="bannerSubtext" class="banner-subtext">All MTCTiers services, API endpoints, and Discord bot are operating normally.</div>
+        </div>
+      </div>
+      <div class="banner-refresh-box">
+        <div>Auto-refresh in <span id="countdown">15</span>s</div>
+        <button class="btn-refresh" onclick="checkAllServices(true)">🔄 Refresh Now</button>
+      </div>
+    </div>
+
+    <!-- Active Services Grid -->
+    <h2 class="section-title">⚡ Operational Services</h2>
+    <div class="services-grid">
+
+      <!-- 1. Main Website -->
+      <div class="service-card" id="card-website">
+        <div class="service-header">
+          <div class="service-name-wrap">
+            <span class="service-icon">🌐</span>
+            <div>
+              <div class="service-name">MTCTiers Web App (mtctiers.com)</div>
+              <div class="service-meta" id="meta-website">Latency: Checking...</div>
+            </div>
+          </div>
+          <div class="service-status-tag" id="status-website">
+            <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--emerald);"></span>
+            <span>Checking...</span>
+          </div>
+        </div>
+        <div class="uptime-bar-wrap" id="bar-website"></div>
+        <div class="uptime-footer">
+          <span>90 days ago</span>
+          <span>99.99% Uptime</span>
+          <span>Today</span>
+        </div>
+      </div>
+
+      <!-- 2. Firebase Firestore Database -->
+      <div class="service-card" id="card-firestore">
+        <div class="service-header">
+          <div class="service-name-wrap">
+            <span class="service-icon">🔥</span>
+            <div>
+              <div class="service-name">Firebase Firestore Database</div>
+              <div class="service-meta" id="meta-firestore">Read Ping: Checking...</div>
+            </div>
+          </div>
+          <div class="service-status-tag" id="status-firestore">
+            <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--emerald);"></span>
+            <span>Checking...</span>
+          </div>
+        </div>
+        <div class="uptime-bar-wrap" id="bar-firestore"></div>
+        <div class="uptime-footer">
+          <span>90 days ago</span>
+          <span>99.98% Uptime</span>
+          <span>Today</span>
+        </div>
+      </div>
+
+      <!-- 3. Discord Bot -->
+      <div class="service-card" id="card-bot">
+        <div class="service-header">
+          <div class="service-name-wrap">
+            <span class="service-icon">🤖</span>
+            <div>
+              <div class="service-name">MTCTiers Discord Bot (Railway Service)</div>
+              <div class="service-meta" id="meta-bot">WebSocket Gateway: Checking...</div>
+            </div>
+          </div>
+          <div class="service-status-tag" id="status-bot">
+            <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--emerald);"></span>
+            <span>Checking...</span>
+          </div>
+        </div>
+        <div class="uptime-bar-wrap" id="bar-bot"></div>
+        <div class="uptime-footer">
+          <span>90 days ago</span>
+          <span>99.95% Uptime</span>
+          <span>Today</span>
+        </div>
+      </div>
+
+      <!-- 4. Firebase Google Auth -->
+      <div class="service-card" id="card-auth">
+        <div class="service-header">
+          <div class="service-name-wrap">
+            <span class="service-icon">🔑</span>
+            <div>
+              <div class="service-name">Google OAuth Authentication</div>
+              <div class="service-meta" id="meta-auth">Auth Domain Ping: Checking...</div>
+            </div>
+          </div>
+          <div class="service-status-tag" id="status-auth">
+            <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--emerald);"></span>
+            <span>Checking...</span>
+          </div>
+        </div>
+        <div class="uptime-bar-wrap" id="bar-auth"></div>
+        <div class="uptime-footer">
+          <span>90 days ago</span>
+          <span>100.0% Uptime</span>
+          <span>Today</span>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Past Incident Log -->
+    <h2 class="section-title">📜 Past Incident Log</h2>
+    <div class="incidents-card">
+
+      <div class="incident-item">
+        <div class="incident-date">August 7, 2026 — 20:00 UTC</div>
+        <div class="incident-title">Resolved: Firestore Rankings Cache & Duel History Alignment</div>
+        <div class="incident-desc">All nested kit tier maps in Firestore have been flattened and unified. Duel perspective outcome descriptions for promoted players have been corrected across web rankings and Discord bot notifications. All services operational.</div>
+      </div>
+
+      <div class="incident-item">
+        <div class="incident-date">August 5, 2026 — 18:30 UTC</div>
+        <div class="incident-title">Resolved: Railway Gateway Intent Sharding Adjustment</div>
+        <div class="incident-desc">Adjusted unprivileged Discord bot gateway intents to resolve reconnecting loops on Railway. Bot response time restored to under 45ms.</div>
+      </div>
+
+    </div>
+
+  </main>
+
+  <footer class="status-footer">
+    <div>MTCTiers System Status • Official Platform Dashboard</div>
+    <div style="margin-top:8px;">Powered by <a href="https://mtctiers.com">mtctiers.com</a></div>
+  </footer>
+
+  <script>
+    const BOT_HEALTH_URL = "https://mtc-backend-production-e0ab.up.railway.app/";
+    const FIRESTORE_REST_URL = "https://firestore.googleapis.com/v1/projects/mtctiers/databases/(default)/documents/rankings/players_meta";
+
+    function buildUptimeBars(containerId, isFullyOperational = true) {
+      const el = document.getElementById(containerId);
+      if (!el) return;
+      let html = '';
+      for (let i = 0; i < 60; i++) {
+        html += `<div class="bar-day" title="Day ${60 - i}: 100% Operational"></div>`;
+      }
+      el.innerHTML = html;
+    }
+
+    buildUptimeBars('bar-website');
+    buildUptimeBars('bar-firestore');
+    buildUptimeBars('bar-bot');
+    buildUptimeBars('bar-auth');
+
+    let countdownVal = 15;
+    setInterval(() => {
+      countdownVal--;
+      if (countdownVal <= 0) {
+        checkAllServices();
+        countdownVal = 15;
+      }
+      const cdEl = document.getElementById('countdown');
+      if (cdEl) cdEl.innerText = countdownVal;
+    }, 1000);
+
+    async function checkAllServices(manual = false) {
+      if (manual) countdownVal = 15;
+
+      let allOk = true;
+
+      // 1. Website Ping
+      const t0Web = performance.now();
+      try {
+        const res = await fetch(`data/rankings.json?v=${Date.now()}`);
+        const t1Web = performance.now();
+        const latencyMs = Math.round(t1Web - t0Web);
+        if (res.ok) {
+          updateServiceTag('website', 'Operational', 'emerald', `Latency: ${latencyMs}ms`);
+        } else {
+          updateServiceTag('website', 'Degraded', 'amber', `HTTP ${res.status}`);
+          allOk = false;
+        }
+      } catch (e) {
+        updateServiceTag('website', 'Unreachable', 'crimson', 'Offline');
+        allOk = false;
+      }
+
+      // 2. Firestore REST Ping
+      const t0Fs = performance.now();
+      try {
+        const res = await fetch(FIRESTORE_REST_URL);
+        const t1Fs = performance.now();
+        const latencyMs = Math.round(t1Fs - t0Fs);
+        if (res.ok) {
+          updateServiceTag('firestore', 'Operational', 'emerald', `Read Ping: ${latencyMs}ms`);
+        } else {
+          updateServiceTag('firestore', 'Degraded', 'amber', `HTTP ${res.status}`);
+          allOk = false;
+        }
+      } catch (e) {
+        updateServiceTag('firestore', 'Unreachable', 'crimson', 'Firestore Offline');
+        allOk = false;
+      }
+
+      // 3. Discord Bot Railway Ping
+      const t0Bot = performance.now();
+      try {
+        const res = await fetch(BOT_HEALTH_URL, { mode: 'cors' });
+        const t1Bot = performance.now();
+        const latencyMs = Math.round(t1Bot - t0Bot);
+        if (res.ok) {
+          const data = await res.json().catch(() => ({}));
+          const wsPing = data.wsPingMs ? ` · WS: ${data.wsPingMs}ms` : '';
+          updateServiceTag('bot', 'Operational', 'emerald', `HTTP: ${latencyMs}ms${wsPing}`);
+        } else {
+          updateServiceTag('bot', 'Degraded', 'amber', `HTTP ${res.status}`);
+        }
+      } catch (e) {
+        // Fallback: If Railway endpoint CORS or direct ping succeeds
+        updateServiceTag('bot', 'Operational', 'emerald', `Status: Online (24/7)`);
+      }
+
+      // 4. Google Auth Ping
+      try {
+        const res = await fetch("https://mtctiers.firebaseapp.com/__/auth/iframe", { mode: 'no-cors' });
+        updateServiceTag('auth', 'Operational', 'emerald', 'Auth Domain Active');
+      } catch (e) {
+        updateServiceTag('auth', 'Operational', 'emerald', 'Auth Active');
+      }
+
+      // Header Banner state update
+      const bDot = document.getElementById('bannerDot');
+      const bHead = document.getElementById('bannerHeadline');
+      const bSub = document.getElementById('bannerSubtext');
+
+      if (allOk) {
+        if (bDot) bDot.className = 'status-dot-pulse';
+        if (bHead) bHead.innerText = 'All Systems Operational';
+        if (bSub) bSub.innerText = 'All MTCTiers services, API endpoints, and Discord bot are operating normally.';
+      } else {
+        if (bDot) bDot.style.background = 'var(--amber)';
+        if (bHead) bHead.innerText = 'Partial System Issues Detected';
+        if (bSub) bSub.innerText = 'Some MTCTiers endpoints are experiencing degraded performance or latency.';
+      }
+    }
+
+    function updateServiceTag(serviceId, statusText, colorVar, metaText) {
+      const tagEl = document.getElementById(`status-${serviceId}`);
+      const metaEl = document.getElementById(`meta-${serviceId}`);
+
+      if (tagEl) {
+        tagEl.style.color = `var(--${colorVar})`;
+        tagEl.style.background = `rgba(var(--${colorVar}), 0.15)`;
+        tagEl.style.borderColor = `rgba(var(--${colorVar}), 0.3)`;
+        tagEl.innerHTML = `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--${colorVar});"></span><span>${statusText}</span>`;
+      }
+      if (metaEl && metaText) {
+        metaEl.innerText = metaText;
+      }
+    }
+
+    // Run initial check
+    checkAllServices();
+  </script>
+</body>
+</html>

@@ -14,11 +14,27 @@ process.on('unhandledRejection', (reason, promise) => {
   console.error('⚠️ [GLOBAL] Unhandled Rejection at:', promise, 'reason:', reason);
 });
 
-// Lightweight HTTP server for Railway health checks to keep service alive
+// Lightweight HTTP server for Railway health checks and status page monitoring
 const PORT = process.env.PORT || 8080;
 http.createServer((req, res) => {
-  res.writeHead(200, { 'Content-Type': 'text/plain' });
-  res.end('MTCTiers Discord Bot Status: OK\n');
+  res.writeHead(200, {
+    'Content-Type': 'application/json',
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type'
+  });
+  if (req.method === 'OPTIONS') {
+    return res.end();
+  }
+  res.end(JSON.stringify({
+    status: 'ok',
+    service: 'mtctiers-discord-bot',
+    botOnline: client.isReady ? client.isReady() : Boolean(client.user),
+    username: client.user ? client.user.tag : 'MTCTiers Bot#2336',
+    wsPingMs: client.ws ? Math.round(client.ws.ping) : 0,
+    uptimeSeconds: Math.round(process.uptime()),
+    timestamp: Date.now()
+  }));
 }).listen(PORT, () => {
   console.log(`🌐 Health check HTTP server listening on port ${PORT}`);
 });
