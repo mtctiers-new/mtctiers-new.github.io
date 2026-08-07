@@ -178,6 +178,29 @@ function getPlayerTitle(pts, rank) {
   return { title: "Unranked", color: 0x6b7280, icon: "" };
 }
 
+function unwrapKitTiers(obj) {
+  if (!obj || typeof obj !== 'object') return {};
+  let result = {};
+  function recurse(o) {
+    if (!o || typeof o !== 'object') return;
+    for (let k in o) {
+      if (k === 'tiers' && typeof o[k] === 'object') {
+        recurse(o[k]);
+      } else {
+        if (!result[k]) result[k] = [];
+        if (Array.isArray(o[k])) {
+          o[k].forEach(item => {
+            const valName = typeof item === 'object' ? item.name : item;
+            if (valName && !result[k].includes(valName)) result[k].push(valName);
+          });
+        }
+      }
+    }
+  }
+  recurse(obj);
+  return result;
+}
+
 async function getFullRankings() {
   try {
     const url = `${BASE_URL}/rankings?pageSize=100`;
@@ -198,10 +221,10 @@ async function getFullRankings() {
       }
       if (docId === 'players_meta' || docId === 'Players') {
         rankingsData.Players = docObj.players || docObj.Players || [];
-      } else if (docId === 'main') {
-        Object.assign(rankingsData, docObj);
+      } else if (['Overall', 'config', 'admin_guide', 'queue_state', 'all_data', 'main', 'whitelist'].includes(docId)) {
+        // Exclude system metadata documents
       } else {
-        rankingsData[docId] = docObj;
+        rankingsData[docId] = unwrapKitTiers(docObj);
       }
     });
 
@@ -222,5 +245,6 @@ module.exports = {
   loadLocalDuels,
   saveLocalDuels,
   recomputeOverallPoints,
-  getPlayerTitle
+  getPlayerTitle,
+  unwrapKitTiers
 };

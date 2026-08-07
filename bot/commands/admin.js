@@ -349,7 +349,7 @@ async function handleAdminCommand(interaction) {
 
       db.recomputeOverallPoints(rankings);
       db.saveLocalRankings(rankings);
-      await db.patchDoc('rankings', kit, { tiers: rankings[kit] });
+      await db.patchDoc('rankings', kit, rankings[kit]);
       await db.patchDoc('rankings', 'players_meta', { players: rankings.Players || [] });
 
       const pts = rankings.Overall[player] || 0;
@@ -369,7 +369,7 @@ async function handleAdminCommand(interaction) {
       }
       db.recomputeOverallPoints(rankings);
       db.saveLocalRankings(rankings);
-      await db.patchDoc('rankings', kit, { tiers: rankings[kit] });
+      await db.patchDoc('rankings', kit, rankings[kit]);
       await db.patchDoc('rankings', 'players_meta', { players: rankings.Players || [] });
 
       return interaction.editReply({ embeds: [successEmbed('🗑️ Tier Removed', `Removed **${player}** tier for **${kit}**.`)] });
@@ -476,7 +476,7 @@ async function handleAdminCommand(interaction) {
 
         db.recomputeOverallPoints(rankings);
         db.saveLocalRankings(rankings);
-        await db.patchDoc('rankings', kit, { tiers: rankings[kit] });
+        await db.patchDoc('rankings', kit, rankings[kit]);
         autoTierMsg = ` (Updated **${targetPlayer}** to **${cleanTier}** in ${kit})`;
       }
 

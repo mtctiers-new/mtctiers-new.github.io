@@ -331,13 +331,34 @@ function getPlayersInTier(tierData) {
   return [];
 }
 
+function unwrapKitTiers(obj) {
+  if (!obj || typeof obj !== 'object') return {};
+  let result = {};
+  function recurse(o) {
+    if (!o || typeof o !== 'object') return;
+    for (let k in o) {
+      if (k === 'tiers' && typeof o[k] === 'object') {
+        recurse(o[k]);
+      } else {
+        if (!result[k]) result[k] = [];
+        if (Array.isArray(o[k])) {
+          o[k].forEach(item => {
+            const valName = typeof item === 'object' ? item.name : item;
+            if (valName && !result[k].includes(valName)) result[k].push(valName);
+          });
+        }
+      }
+    }
+  }
+  recurse(obj);
+  return result;
+}
+
 function normalizeDataKits(dataObj) {
   if (!dataObj || typeof dataObj !== 'object') return dataObj;
   for (let kit in dataObj) {
     if (kit === 'Overall' || kit === 'Players' || kit === 'whitelist') continue;
-    if (dataObj[kit] && dataObj[kit].tiers && typeof dataObj[kit].tiers === 'object') {
-      dataObj[kit] = dataObj[kit].tiers;
-    }
+    dataObj[kit] = unwrapKitTiers(dataObj[kit]);
   }
   return dataObj;
 }
@@ -722,24 +743,26 @@ async function renderTestersView() {
 
 function duelPerspective(d, playerName) {
   const cleanTarget = (playerName || '').toLowerCase().trim();
-  const isP1 = (d.player1 || '').toLowerCase().trim() === cleanTarget;
-  const isP2 = (d.player2 || '').toLowerCase().trim() === cleanTarget;
+  const cleanP1 = (d.player1 || '').toLowerCase().trim();
+  const cleanP2 = (d.player2 || '').toLowerCase().trim();
+  const isP1 = cleanP1 === cleanTarget;
+  const isP2 = cleanP2 === cleanTarget;
 
-  let won = false;
-  if (d.winner && typeof d.winner === 'string') {
-    won = d.winner.toLowerCase().trim() === cleanTarget;
-  } else if (d.player1_score !== undefined && d.player2_score !== undefined) {
+  let winnerName = (d.winner || '').trim();
+  if (!winnerName) {
     const s1 = parseInt(d.player1_score, 10) || 0;
     const s2 = parseInt(d.player2_score, 10) || 0;
-    won = isP1 ? s1 > s2 : s2 > s1;
-  } else {
-    won = isP1 ? d.result === 'Won' : d.result === 'Lost';
+    if (s1 > s2) winnerName = d.player1;
+    else if (s2 > s1) winnerName = d.player2;
+    else winnerName = d.result === 'Won' ? (isP1 ? d.player1 : d.player2) : (isP1 ? d.player2 : d.player1);
   }
 
+  const won = winnerName.toLowerCase().trim() === cleanTarget;
   const myScore = isP1 ? d.player1_score : d.player2_score;
   const oppScore = isP1 ? d.player2_score : d.player1_score;
-  const opponent = isP1 ? d.player2 : d.player1;
-  return { won, myScore, oppScore, opponent, isP1 };
+  const opponent = isP1 ? d.player2 : (isP2 ? d.player1 : (d.player1 || 'Opponent'));
+
+  return { won, myScore, oppScore, opponent, isP1, winnerName };
 }
 
 function duelDescLine(d, playerName) {
@@ -748,21 +771,39 @@ function duelDescLine(d, playerName) {
   }
   const kit = (!d.kit || d.kit === 'Unknown') ? '' : d.kit;
   const tier = (!d.tier || d.tier === 'Unknown') ? '' : d.tier;
-  
-  if (d.outcome && typeof d.outcome === 'string') {
-    const oc = d.outcome.trim();
-    if (oc.includes('promoted') || oc.includes('demoted') || oc.includes('failed')) {
-      if (oc.includes(' ')) return oc;
-    }
-    const subject = d.player1 || playerName;
-    if (oc === 'failed') {
-      return `${subject} failed${tier ? ' ' + tier : ''}${kit ? ' in ' + kit : ''}`;
-    }
-    const verb = oc === 'promoted' ? 'promoted' : oc === 'demoted' ? 'demoted' : oc;
-    const toTier = tier ? ` to ${tier}` : '';
-    const inKit = kit ? ` in ${kit}` : '';
-    return `${subject} has been ${verb}${toTier}${inKit}`;
+  const rawOc = (d.outcome || '').trim();
+
+  let winnerName = (d.winner || '').trim();
+  let loserName = '';
+  if (d.player1 && d.player2) {
+    if (winnerName.toLowerCase() === d.player1.toLowerCase()) loserName = d.player2;
+    else if (winnerName.toLowerCase() === d.player2.toLowerCase()) loserName = d.player1;
   }
+  if (!winnerName) {
+    const s1 = parseInt(d.player1_score, 10) || 0;
+    const s2 = parseInt(d.player2_score, 10) || 0;
+    if (s1 > s2) { winnerName = d.player1; loserName = d.player2; }
+    else if (s2 > s1) { winnerName = d.player2; loserName = d.player1; }
+  }
+
+  if (rawOc) {
+    const lowerOc = rawOc.toLowerCase();
+    if (lowerOc.includes('promoted')) {
+      const targetTier = tier || (rawOc.match(/ht\d|lt\d|rht\d|rlt\d/i) || [''])[0].toUpperCase();
+      return `${winnerName || 'Winner'} has been promoted${targetTier ? ' to ' + targetTier : ''}${kit ? ' in ' + kit : ''}`;
+    }
+    if (lowerOc.includes('demoted')) {
+      const targetTier = tier || (rawOc.match(/ht\d|lt\d|rht\d|rlt\d/i) || [''])[0].toUpperCase();
+      const demotedSubject = loserName || d.player1 || 'Player';
+      return `${demotedSubject} has been demoted${targetTier ? ' to ' + targetTier : ''}${kit ? ' in ' + kit : ''}`;
+    }
+    if (lowerOc.includes('failed')) {
+      const failedSubject = loserName || d.player1 || 'Player';
+      return `${failedSubject} failed${tier ? ' ' + tier : ''}${kit ? ' in ' + kit : ''}`;
+    }
+    return rawOc;
+  }
+
   return `${kit}${tier ? ' · ' + tier : ''}`.trim();
 }
 
@@ -778,19 +819,19 @@ function openDuelPopup(d, perspective) {
   const p = perspective || d.player1;
   const info = duelPerspective(d, p);
   const date = new Date(d.timestamp || d.created_at * 1000 || Date.now()).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-  const oc = d.outcome || 'tested';
-  const ocColor = oc === 'promoted' ? 'var(--emerald)' : oc === 'demoted' ? 'var(--crimson)' : oc === 'failed' ? '#ff8800' : 'var(--text-muted)';
+  const desc = duelDescLine(d, p);
+  const cardColor = info.won ? 'var(--emerald)' : 'var(--crimson)';
 
   document.getElementById('duelPopupContent').innerHTML = `
     <div style="text-align:center;">
       <div style="font-family:var(--font-mono);font-size:0.75rem;color:var(--text-muted);letter-spacing:2px;margin-bottom:12px;">${d.kit || ''} ${d.tier && d.tier !== 'Unknown' ? '· ' + d.tier : ''}</div>
-      ${oc !== 'tested' ? `<div style="font-family:var(--font-mono);font-size:0.8rem;color:${ocColor};border:1px solid ${ocColor};border-radius:20px;padding:4px 16px;display:inline-block;margin-bottom:16px;letter-spacing:1px;font-weight:700;">${oc.toUpperCase()}</div>` : ''}
+      <div style="font-family:var(--font-mono);font-size:0.8rem;color:${cardColor};border:1px solid ${cardColor};border-radius:20px;padding:4px 16px;display:inline-block;margin-bottom:16px;letter-spacing:1px;font-weight:700;">${desc}</div>
       <div style="display:flex;align-items:center;justify-content:center;gap:16px;margin-bottom:16px;">
         <span style="font-family:var(--font-heading);font-weight:800;font-size:1.2rem;color:#fff;cursor:pointer;" onclick="closeDuelPopup();openProfile('${d.player1}')">${d.player1}</span>
         <span style="font-family:var(--font-mono);font-size:0.8rem;color:var(--cyan);">VS</span>
-        <span style="font-family:var(--font-heading);font-weight:800;font-size:1.2rem;color:var(--text-muted);cursor:pointer;" onclick="closeDuelPopup();openProfile('${d.player2}')">${d.player2}</span>
+        <span style="font-family:var(--font-heading);font-weight:800;font-size:1.2rem;color:#fff;cursor:pointer;" onclick="closeDuelPopup();openProfile('${d.player2}')">${d.player2}</span>
       </div>
-      <div style="font-family:var(--font-heading);font-weight:900;font-size:3rem;color:${info.won ? 'var(--emerald)' : 'var(--crimson)'};letter-spacing:4px;line-height:1;margin-bottom:12px;">${info.myScore} - ${info.oppScore}</div>
+      <div style="font-family:var(--font-heading);font-weight:900;font-size:3rem;color:${cardColor};letter-spacing:4px;line-height:1;margin-bottom:12px;">${d.player1_score} - ${d.player2_score}</div>
       <div style="font-family:var(--font-mono);font-size:0.75rem;color:var(--text-dim);">${date}</div>
     </div>`;
   document.getElementById('duelPopupModal').classList.add('active');
