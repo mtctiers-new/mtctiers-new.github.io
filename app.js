@@ -1209,6 +1209,16 @@ function animatePointsCount(targetPts) {
   }, 30);
 }
 
+function isPlayerInTier(tierList, playerName) {
+  if (!tierList || !Array.isArray(tierList) || !playerName) return false;
+  const cleanTarget = playerName.toLowerCase().trim();
+  return tierList.some(item => {
+    if (!item) return false;
+    const name = typeof item === 'object' ? item.name : item;
+    return (name || '').toString().toLowerCase().trim() === cleanTarget;
+  });
+}
+
 function renderProfileKitGrid(name) {
   const container = document.getElementById('pTiers');
   let html = '';
@@ -1218,9 +1228,9 @@ function renderProfileKitGrid(name) {
     const kitConfig = KIT_MAP[kit];
     let evaluatedTier = null;
 
-    if (DATA[kit]) {
+    if (DATA[kit] && typeof DATA[kit] === 'object') {
       for (let tier in DATA[kit]) {
-        if (DATA[kit][tier].includes(name)) {
+        if (isPlayerInTier(DATA[kit][tier], name)) {
           evaluatedTier = tier;
           break;
         }
@@ -1254,9 +1264,9 @@ function getPlayerKitBadges(name) {
   let html = '';
   Object.keys(KIT_MAP).forEach(kit => {
     if (kit === "Overall") return;
-    if (DATA[kit]) {
+    if (DATA[kit] && typeof DATA[kit] === 'object') {
       for (let tier in DATA[kit]) {
-        if (DATA[kit][tier].includes(name)) {
+        if (isPlayerInTier(DATA[kit][tier], name)) {
           const img = KIT_MAP[kit].img;
           html += `
             <div class="ol-kit-badge" title="${kit}: ${tier}">
