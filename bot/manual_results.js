@@ -26,8 +26,8 @@ function parseManualResultText(text) {
     }
   }
 
-  // Tested player & action & tier (strictly requires HT1-5, LT1-5, RHT1-5, RLT1-5)
-  const actionRegex = /(?:@\S+\s*-\s*)?([a-zA-Z0-9_-]{2,20})\s+(failed|has been promoted to|promoted to|promoted|has been demoted to|demoted to|demoted)\s+([R]?[HL]T[1-5])/i;
+  // Tested player & action & tier (supports <@ID> pings, `IGN` backticks, and **TIER** bold formatting)
+  const actionRegex = /(?:(?:<@\d+>|@\S+)\s*-\s*)?`?([a-zA-Z0-9_-]{2,20})`?\s+(failed|has been promoted to|promoted to|promoted|has been demoted to|demoted to|demoted)\s+\*?\*?([R]?[HL]T[1-5])\*?\*?\s+in\s+([A-Za-z0-9\s]+)/i;
   const mAction = text.match(actionRegex);
 
   if (!mAction) return null;
@@ -41,9 +41,8 @@ function parseManualResultText(text) {
   if (rawOutcome.includes('failed')) outcome = 'failed';
   else if (rawOutcome.includes('demote')) outcome = 'demoted';
 
-  // Fight record & opponent
-  // e.g. "Lost 12-0 against @Game1K (Can't Tier Test BC HT1) - Game1K" or "Won 5-0 against @Coldhert - x9jm"
-  const fightRegex = /(Won|Lost)\s+(\d+)-(\d+)\s+against\s+(?:@\S+.*?-\s*)?([a-zA-Z0-9_-]{2,20})/i;
+  // Fight record & opponent (supports blockquotes '>', <@ID> pings, `IGN` backticks)
+  const fightRegex = /(?:>\s*)?(Won|Lost)\s+(\d+)-(\d+)\s+against\s+(?:(?:<@\d+>|@\S+).*?-\s*)?`?([a-zA-Z0-9_-]{2,20})`?/i;
   const mFight = text.match(fightRegex);
 
   let p1_score = 0;
