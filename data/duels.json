@@ -5,14 +5,16 @@
       "id": 687,
       "player1_score": 10,
       "player2_score": 2,
-      "player1": "**big-nub**",
+      "player1": "Game1K",
       "kit": "Dragonhide KB",
       "created_at": 1785337708,
-      "result": "Lost",
+      "result": "Won",
       "timestamp": "2026-03-26T01:22:03.161000+00:00",
       "outcome": "promoted",
       "tier": "LT1",
-      "player2": "Game1K"
+      "player2": "big_nub",
+      "winner": "Game1K",
+      "note": "Game1K promoted to LT1 in Dragonhide KB"
     },
     {
       "created_at": 1785340409,
@@ -479,7 +481,7 @@
       "tier": "HT4",
       "kit": "Unknown",
       "player2_score": 19,
-      "player1": "Coco has been promoted to **HT4** in KB",
+      "player1": "Coco has been promoted to HT4 in KB",
       "timestamp": "2026-04-05T17:42:27.170000+00:00",
       "result": "Lost",
       "created_at": 1785337709,
@@ -510,7 +512,7 @@
       "id": 714,
       "kit": "Emerald KB",
       "player2_score": 0,
-      "player1": "Corpse promoted to **HT4** in Emerald KB",
+      "player1": "Corpse promoted to HT4 in Emerald KB",
       "created_at": 1785337710,
       "timestamp": "2026-04-27T02:13:38.806000+00:00",
       "result": "Lost"
@@ -1227,7 +1229,9 @@
       "created_at": 1785337708,
       "id": 687,
       "message_id": "1486535673925079142",
-      "player1_score": 10
+      "player1_score": 10,
+      "winner": "Game1K",
+      "note": "Game1K promoted to LT1 in Dragonhide KB"
     },
     {
       "created_at": 1785337709,
@@ -1521,7 +1525,7 @@
       "created_at": 1785337710,
       "kit": "Unknown",
       "player2_score": 5,
-      "player1": "Kaeye has been promoted to **LT3** in KB"
+      "player1": "Kaeye has been promoted to LT3 in KB"
     },
     {
       "player2": "Blade",
@@ -2411,7 +2415,7 @@
       "result": "Lost",
       "kit": "Unknown",
       "player2_score": 5,
-      "player1": "Kaeye has been promoted to **LT3** in KB",
+      "player1": "Kaeye has been promoted to LT3 in KB",
       "player1_score": 3,
       "message_id": "1495829502205497374",
       "id": 706,
@@ -2427,7 +2431,7 @@
       "timestamp": "2026-04-05T17:42:27.170000+00:00",
       "result": "Lost",
       "player2_score": 19,
-      "player1": "Coco has been promoted to **HT4** in KB",
+      "player1": "Coco has been promoted to HT4 in KB",
       "kit": "Unknown",
       "tier": "HT4",
       "outcome": "promoted",
@@ -2494,7 +2498,7 @@
       "message_id": "1494740492817141820",
       "id": 704,
       "kit": "Emerald KB",
-      "player1": "LifoMC failed **HT2** in Emerald KB",
+      "player1": "LifoMC failed HT2 in Emerald KB",
       "player2_score": 5,
       "created_at": 1785337710,
       "timestamp": "2026-04-17T16:45:04.423000+00:00",
@@ -6857,7 +6861,9 @@
       "kit": "Dragonhide KB",
       "tier": "LT1",
       "outcome": "promoted",
-      "player2": "big_nub"
+      "player2": "big_nub",
+      "winner": "Game1K",
+      "note": "Game1K promoted to LT1 in Dragonhide KB"
     },
     {
       "player2": "Vorthexis",
@@ -7586,7 +7592,7 @@
     },
     {
       "player2_score": 0,
-      "player1": "salton promoted to **HT5** in Emerald KB",
+      "player1": "salton promoted to HT5 in Emerald KB",
       "kit": "Emerald KB",
       "created_at": 1785337710,
       "timestamp": "2026-04-27T02:10:18.099000+00:00",
