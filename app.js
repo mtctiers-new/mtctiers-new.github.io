@@ -125,12 +125,52 @@ async function checkWhitelistStatus(email) {
   if (matched) {
     CURRENT_ROLE = matched.role || 'player';
     IS_ADMIN = (CURRENT_ROLE === 'admin');
-    CURRENT_ASSIGNED_PLAYER = matched.assignedPlayer || EMAIL_TO_PLAYER[cleanEmail] || '*';
+    CURRENT_ASSIGNED_PLAYER = IS_ADMIN ? '*' : (matched.assignedPlayer || EMAIL_TO_PLAYER[cleanEmail] || null);
   } else {
     IS_ADMIN = ['ziadn6b@gmail.com', 'v4n1shedytoffical@gmail.com', 'v41nshedytoffical@gmail.com'].includes(cleanEmail);
     CURRENT_ROLE = IS_ADMIN ? 'admin' : 'player';
-    CURRENT_ASSIGNED_PLAYER = EMAIL_TO_PLAYER[cleanEmail] || '*';
+    CURRENT_ASSIGNED_PLAYER = IS_ADMIN ? '*' : (EMAIL_TO_PLAYER[cleanEmail] || null);
   }
+}
+
+function isAuthorizedToEditProfile(targetPlayerName) {
+  if (!CURRENT_USER) return false;
+  if (IS_ADMIN === true) return true;
+  if (!targetPlayerName || typeof targetPlayerName !== 'string') return false;
+
+  const targetClean = targetPlayerName.toLowerCase().trim();
+
+  // Match 1: Whitelisted Assigned Profile
+  if (CURRENT_ASSIGNED_PLAYER && CURRENT_ASSIGNED_PLAYER !== '*') {
+    if (CURRENT_ASSIGNED_PLAYER.toLowerCase().trim() === targetClean) return true;
+  }
+
+  // Match 2: Mapped Email
+  const userEmail = (CURRENT_USER.email || '').toLowerCase().trim();
+  if (userEmail && EMAIL_TO_PLAYER[userEmail]) {
+    if (EMAIL_TO_PLAYER[userEmail].toLowerCase().trim() === targetClean) return true;
+  }
+
+  return false;
+}
+
+function escapeHTML(str) {
+  if (str === null || str === undefined) return '';
+  return String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+function sanitizeSafeUrl(urlStr) {
+  if (!urlStr || typeof urlStr !== 'string') return '';
+  const clean = urlStr.trim();
+  if (/^https?:\/\/[^\s<>"'\\]+$/i.test(clean)) {
+    return clean;
+  }
+  return '';
 }
 
 async function loginWithGoogle() {
@@ -957,11 +997,12 @@ async function openProfile(name) {
 
   const pDetail = getPlayerMeta(name);
 
-  // Custom Banner / BG Image
+  // Custom Banner / BG Image (Sanitized)
   const bannerEl = document.getElementById('pBanner');
   if (bannerEl) {
-    if (pDetail.bannerUrl && pDetail.bannerUrl.trim()) {
-      bannerEl.style.backgroundImage = `url('${pDetail.bannerUrl.trim()}')`;
+    const safeBanner = sanitizeSafeUrl(pDetail.bannerUrl);
+    if (safeBanner) {
+      bannerEl.style.backgroundImage = `url('${safeBanner}')`;
       bannerEl.style.backgroundSize = 'cover';
       bannerEl.style.backgroundPosition = 'center';
     } else {
@@ -970,7 +1011,10 @@ async function openProfile(name) {
   }
 
   // Accent Color Application
-  const accent = pDetail.accentColor && pDetail.accentColor.trim() ? pDetail.accentColor.trim() : '#00eeff';
+  const accent = (pDetail.accentColor && /^#[0-9a-fA-F]{6}$/.test(pDetail.accentColor.trim())) 
+    ? pDetail.accentColor.trim() 
+    : '#00eeff';
+
   const pCard = document.querySelector('.profile-modal-card');
   if (pCard) {
     pCard.style.borderColor = accent;
@@ -978,22 +1022,13 @@ async function openProfile(name) {
   }
   const nameEl = document.getElementById('pName');
   if (nameEl) {
+    nameEl.innerText = name;
     nameEl.style.color = accent;
   }
 
-  // Profile Edit button visibility check (Self, Assigned Profile, or Admin)
+  // Strict Profile Edit button authorization check
   const pEditBtn = document.getElementById('pEditBtn');
-  const userEmail = (CURRENT_USER?.email || '').toLowerCase().trim();
-  const assignedP = (CURRENT_ASSIGNED_PLAYER || '').toLowerCase().trim();
-  const targetP = name.toLowerCase().trim();
-
-  const canEdit = IS_ADMIN || 
-                  assignedP === '*' ||
-                  (assignedP !== '' && assignedP === targetP) ||
-                  ((EMAIL_TO_PLAYER[userEmail] || '').toLowerCase().trim() === targetP && targetP !== '') ||
-                  (userEmail === targetP && targetP !== '') ||
-                  userEmail.split('@')[0] === targetP ||
-                  (CURRENT_USER?.displayName || '').toLowerCase().trim() === targetP;
+  const canEdit = isAuthorizedToEditProfile(name);
 
   if (pEditBtn) {
     pEditBtn.style.display = canEdit ? 'inline-flex' : 'none';
@@ -1340,29 +1375,33 @@ function closeEditProfileModalOnBackdrop(e) {
 async function saveProfileCustomization() {
   if (!CURRENT_PLAYER) return;
 
-  const userEmail = (CURRENT_USER?.email || '').toLowerCase().trim();
-  const assignedP = (CURRENT_ASSIGNED_PLAYER || '').toLowerCase().trim();
-  const targetP = CURRENT_PLAYER.toLowerCase().trim();
-
-  const canEdit = IS_ADMIN || 
-                  assignedP === '*' ||
-                  (assignedP !== '' && assignedP === targetP) ||
-                  ((EMAIL_TO_PLAYER[userEmail] || '').toLowerCase().trim() === targetP && targetP !== '') ||
-                  (userEmail === targetP && targetP !== '') ||
-                  userEmail.split('@')[0] === targetP ||
-                  (CURRENT_USER?.displayName || '').toLowerCase().trim() === targetP;
-
-  if (!canEdit) {
-    alert("❌ Permission Denied: You are only authorized to edit your assigned player profile.");
+  // Strict security authorization check
+  if (!isAuthorizedToEditProfile(CURRENT_PLAYER)) {
+    alert("❌ Security Violation: You are not authorized to edit this player profile!");
+    closeEditProfileModal();
     return;
   }
 
-  const skinUrl = document.getElementById('epSkinUrl').value.trim();
-  const bannerUrl = document.getElementById('epBannerUrl').value.trim();
+  const rawSkin = document.getElementById('epSkinUrl').value.trim();
+  const rawBanner = document.getElementById('epBannerUrl').value.trim();
   const accentColor = document.getElementById('epColor').value;
   const lfm = document.getElementById('epLfm').value === 'ON';
-  const rival = document.getElementById('epRival').value.trim();
-  const description = document.getElementById('epDesc').value.trim();
+  const rawRival = document.getElementById('epRival').value.trim();
+  const rawDesc = document.getElementById('epDesc').value.trim();
+
+  // Validate URLs to prevent XSS / malicious schemes
+  const skinUrl = sanitizeSafeUrl(rawSkin);
+  const bannerUrl = sanitizeSafeUrl(rawBanner);
+
+  if (rawSkin && !skinUrl) {
+    return alert("Invalid Skin Image URL! Must start with http:// or https://");
+  }
+  if (rawBanner && !bannerUrl) {
+    return alert("Invalid Banner Image URL! Must start with http:// or https://");
+  }
+
+  const rival = escapeHTML(rawRival).slice(0, 50);
+  const description = escapeHTML(rawDesc).slice(0, 500);
 
   let pIndex = (DATA.Players || []).findIndex(p => (typeof p === 'object' ? p.name : p).toLowerCase() === CURRENT_PLAYER.toLowerCase());
   let existingObj = pIndex !== -1 && typeof DATA.Players[pIndex] === 'object' ? DATA.Players[pIndex] : { name: CURRENT_PLAYER };
@@ -1372,7 +1411,7 @@ async function saveProfileCustomization() {
     name: CURRENT_PLAYER,
     skinUrl,
     bannerUrl,
-    accentColor,
+    accentColor: /^#[0-9a-fA-F]{6}$/.test(accentColor) ? accentColor : '#00eeff',
     lfm,
     rival,
     description
