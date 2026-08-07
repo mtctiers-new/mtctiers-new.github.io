@@ -3,7 +3,8 @@ const http = require('http');
 const config = require('./config');
 const { adminCommands, handleAdminCommand } = require('./commands/admin');
 const { playerCommands, handlePlayerCommand } = require('./commands/player');
-const { queueCommands, handleQueueCommand, handleQueueButton, updateQueuePanel } = require('./commands/queue');
+const { queueCommands, handleQueueCommand, handleQueueButton, handleQueueModal, updateQueuePanel } = require('./commands/queue');
+const { parseManualResultText, processManualResult, TARGET_RESULTS_CHANNEL } = require('./manual_results');
 
 // Global error handlers to prevent process crashes on network drops/unhandled promises
 process.on('uncaughtException', (err) => {
@@ -41,7 +42,9 @@ http.createServer((req, res) => {
 
 const client = new Client({
   intents: [
-    GatewayIntentBits.Guilds
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.MessageContent
   ]
 });
 
@@ -180,9 +183,31 @@ function getCachedPlayerList() {
   return CACHED_PLAYER_LIST;
 }
 
+client.on('messageCreate', async message => {
+  if (message.author.bot) return;
+  if (message.channel.id !== TARGET_RESULTS_CHANNEL) return;
+
+  try {
+    const parsed = parseManualResultText(message.content);
+    if (parsed) {
+      await processManualResult(parsed);
+      await message.react('✅').catch(() => {});
+      await message.reply({
+        content: `✅ **Manual Result Recorded!** Updated rankings & duel history for **${parsed.player}** vs **${parsed.opponent}** in **${parsed.kit}** (${parsed.tier || parsed.rawOutcome}). Live on mtctiers.com!`
+      }).catch(() => {});
+    }
+  } catch (err) {
+    console.error('Error processing manual result message:', err);
+  }
+});
+
 client.on('interactionCreate', async interaction => {
   if (interaction.isButton()) {
     return handleQueueButton(interaction);
+  }
+
+  if (interaction.isModalSubmit()) {
+    return handleQueueModal(interaction);
   }
 
   if (interaction.isAutocomplete()) {

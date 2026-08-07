@@ -1,6 +1,7 @@
 const { SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits } = require('discord.js');
 const db = require('../firebase');
 const config = require('../config');
+const { buildTestResultEmbed, TARGET_RESULTS_CHANNEL } = require('../manual_results');
 
 function isAdmin(interaction) {
   if (!interaction) return false;
@@ -147,7 +148,21 @@ const adminCommands = [
     .addIntegerOption(o => o.setName('player2_score').setDescription('Player 2 score').setRequired(true))
     .addStringOption(o => o.setName('outcome').setDescription('Outcome (e.g. Promoted, Tier Test)').setRequired(true))
     .addStringOption(o => o.setName('new_tier').setDescription('Update winner/tested player tier automatically (e.g. HT1, LT2, HT4)').setRequired(false))
-    .addAttachmentOption(o => o.setName('proof_image').setDescription('Proof screenshot/image').setRequired(false))
+    .addStringOption(o => o.setName('previous_rank').setDescription('Previous Rank (e.g. Low Tier 4)').setRequired(false))
+    .addStringOption(o => o.setName('region').setDescription('Region (NA, EU, AS, SA)').setRequired(false))
+    .addAttachmentOption(o => o.setName('proof_image').setDescription('Proof screenshot/image').setRequired(false)),
+
+  new SlashCommandBuilder().setName('removeduel').setDescription('[Admin] Remove a broken or glitched duel from a player history')
+    .addStringOption(o => o.setName('player').setDescription('Player username').setRequired(true).setAutocomplete(true))
+    .addIntegerOption(o => o.setName('duel_number').setDescription('Duel number in history (1 = most recent)').setRequired(true)),
+
+  new SlashCommandBuilder().setName('editduel').setDescription('[Admin] Edit a broken or glitched duel in a player history')
+    .addStringOption(o => o.setName('player').setDescription('Player username').setRequired(true).setAutocomplete(true))
+    .addIntegerOption(o => o.setName('duel_number').setDescription('Duel number in history (1 = most recent)').setRequired(true))
+    .addIntegerOption(o => o.setName('player1_score').setDescription('New player 1 score').setRequired(false))
+    .addIntegerOption(o => o.setName('player2_score').setDescription('New player 2 score').setRequired(false))
+    .addStringOption(o => o.setName('outcome').setDescription('New outcome text').setRequired(false))
+    .addStringOption(o => o.setName('tier').setDescription('New target tier').setRequired(false))
 ];
 
 async function handleAdminCommand(interaction) {
@@ -455,8 +470,9 @@ async function handleAdminCommand(interaction) {
       const s2 = options.getInteger('player2_score');
       const outcome = (options.getString('outcome') || 'Tier Test').trim();
       const newTierOpt = options.getString('new_tier');
+      const prevRank = options.getString('previous_rank') || 'Unranked';
+      const region = (options.getString('region') || 'NA').toUpperCase();
       const imgAttachment = options.getAttachment('proof_image');
-      const dateStr = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
       let autoTierMsg = '';
 
       if (newTierOpt && newTierOpt.trim()) {
@@ -498,45 +514,77 @@ async function handleAdminCommand(interaction) {
         await db.patchDoc('duels', p2, { player: p2, duels: p2List, count: p2List.length });
       } catch (e) { console.warn('Firestore duel patch note:', e.message); }
 
-      const isP1Winner = winner.toLowerCase() === p1.toLowerCase();
-      const p1Emoji = isP1Winner ? '👑' : '⚔️';
-      const p2Emoji = !isP1Winner ? '👑' : '⚔️';
+      const resultEmbed = buildTestResultEmbed({
+        player: winner,
+        tester: interaction.user.id,
+        region,
+        prevRank,
+        rankEarned: newTierOpt || outcome,
+        kit,
+        score: `${s1} - ${s2}`,
+        proofUrl: imgAttachment ? imgAttachment.url : null
+      });
 
-      const LOGO_URL = 'https://raw.githubusercontent.com/mtctiers-new/mtctiers-new.github.io/main/assets/mtctiers.png';
-
-      const duelEmbed = new EmbedBuilder()
-        .setAuthor({ name: 'MTCTiers Official Duel Announcement', iconURL: LOGO_URL })
-        .setThumbnail(LOGO_URL)
-        .setTitle(`⚔️ MTC TIERS DUEL RESULT`)
-        .setDescription(`**${p1}** vs **${p2}**\n**Kit:** ${kit}`)
-        .addFields(
-          { name: `${p1Emoji} ${p1}`, value: `Score: **${s1}**`, inline: true },
-          { name: `${p2Emoji} ${p2}`, value: `Score: **${s2}**`, inline: true },
-          { name: `🏆 Winner`, value: `**${winner}** (${outcome.toUpperCase()})`, inline: false },
-          { name: `📅 Date`, value: dateStr, inline: true }
-        )
-        .setColor(0x00eeff)
-        .setFooter({ text: 'MTCTiers Official System • mtctiers.com', iconURL: LOGO_URL })
-        .setTimestamp();
-
-      if (imgAttachment) {
-        duelEmbed.setImage(imgAttachment.url);
-      }
-
-      let channelMsg = '';
-      if (config.announcementChannelId) {
-        try {
-          const annChannel = await interaction.client.channels.fetch(config.announcementChannelId);
-          if (annChannel) {
-            await annChannel.send({ embeds: [duelEmbed] });
-            channelMsg = ` & posted to <#${config.announcementChannelId}>`;
-          }
-        } catch (e) {
-          console.warn('Failed to send to announcement channel:', e.message);
+      let targetChan = null;
+      try {
+        const chanId = TARGET_RESULTS_CHANNEL || config.announcementChannelId;
+        targetChan = await interaction.client.channels.fetch(chanId).catch(() => null);
+        if (targetChan) {
+          await targetChan.send({ embeds: [resultEmbed] });
         }
+      } catch (e) {
+        console.warn('Failed to send announcement embed:', e.message);
       }
 
-      return interaction.editReply({ content: `✅ **Duel Recorded**${autoTierMsg}${channelMsg}!`, embeds: [duelEmbed] });
+      const chanNote = targetChan ? ` & posted embed to <#${targetChan.id}>` : '';
+      return interaction.editReply({ content: `✅ **Duel Recorded** for **${p1}** vs **${p2}** (${s1} - ${s2}) in **${kit}**${autoTierMsg}${chanNote}!` });
+    }
+
+    if (commandName === 'removeduel') {
+      const player = options.getString('player').trim();
+      const num = options.getInteger('duel_number');
+
+      const doc = await db.getDoc('duels', player);
+      if (!doc || !Array.isArray(doc.duels) || !doc.duels.length) {
+        return interaction.editReply({ content: `⚠️ No duel history found for **${player}**.` });
+      }
+
+      if (num < 1 || num > doc.duels.length) {
+        return interaction.editReply({ content: `⚠️ Invalid duel number. Total duels: **${doc.duels.length}**.` });
+      }
+
+      const removed = doc.duels.splice(num - 1, 1)[0];
+      await db.patchDoc('duels', player, { player, duels: doc.duels, count: doc.duels.length });
+
+      return interaction.editReply({ content: `🗑️ **Duel Removed**: Removed duel #${num} (${removed.kit} · ${removed.player1} vs ${removed.player2}) for **${player}**.` });
+    }
+
+    if (commandName === 'editduel') {
+      const player = options.getString('player').trim();
+      const num = options.getInteger('duel_number');
+      const s1 = options.getInteger('player1_score');
+      const s2 = options.getInteger('player2_score');
+      const outcome = options.getString('outcome');
+      const tier = options.getString('tier');
+
+      const doc = await db.getDoc('duels', player);
+      if (!doc || !Array.isArray(doc.duels) || !doc.duels.length) {
+        return interaction.editReply({ content: `⚠️ No duel history found for **${player}**.` });
+      }
+
+      if (num < 1 || num > doc.duels.length) {
+        return interaction.editReply({ content: `⚠️ Invalid duel number. Total duels: **${doc.duels.length}**.` });
+      }
+
+      const d = doc.duels[num - 1];
+      if (s1 !== null) d.player1_score = s1;
+      if (s2 !== null) d.player2_score = s2;
+      if (outcome) d.outcome = outcome;
+      if (tier) d.tier = tier;
+
+      await db.patchDoc('duels', player, { player, duels: doc.duels, count: doc.duels.length });
+
+      return interaction.editReply({ content: `✏️ **Duel Updated**: Updated duel #${num} for **${player}** (${d.kit} · Score: ${d.player1_score} - ${d.player2_score}).` });
     }
 
   } catch (err) {

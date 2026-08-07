@@ -1,6 +1,7 @@
-const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ChannelType, PermissionFlagsBits, ModalBuilder, TextInputBuilder, TextInputStyle } = require('discord.js');
 const db = require('../firebase');
 const config = require('../config');
+const { buildTestResultEmbed, TARGET_RESULTS_CHANNEL } = require('../manual_results');
 
 const LOGO_URL = 'https://raw.githubusercontent.com/mtctiers-new/mtctiers-new.github.io/main/assets/mtctiers.png';
 const TARGET_CHANNEL_ID = '1524107242394091630';
@@ -17,7 +18,7 @@ const TIER_TESTERS = [
 function isTesterOrAdmin(member, userId) {
   if (TIER_TESTERS.some(t => t.userId === userId)) return true;
   if (!member) return false;
-  if (member.permissions && member.permissions.has('Administrator')) return true;
+  if (member.permissions && member.permissions.has(PermissionFlagsBits.Administrator)) return true;
   if (config.adminRoleIds && config.adminRoleIds.length > 0) {
     return config.adminRoleIds.some(r => member.roles && member.roles.cache && member.roles.cache.has(r));
   }
@@ -138,7 +139,7 @@ const queueCommands = [
 async function handleQueueCommand(interaction) {
   await interaction.deferReply({ ephemeral: interaction.commandName !== 'tiertesters' && interaction.commandName !== 'sendqueuepanel' });
 
-  const { commandName, options, member, user, channel, client } = interaction;
+  const { commandName, options, member, user, channel, client, guild } = interaction;
   const data = await getQueueData();
 
   try {
@@ -209,13 +210,52 @@ async function handleQueueCommand(interaction) {
       await saveQueueData(data);
       await updateQueuePanel(client);
 
-      const alertMsg = `⚔️ **<@${user.id}>** is now testing **<@${nextPlayer.userId}>** (\`${nextPlayer.username}\`)! Get ready for your test!`;
+      // Create private channel for testing
+      let testChan = null;
       try {
-        const chan = await client.channels.fetch(TARGET_CHANNEL_ID).catch(() => null);
-        if (chan) await chan.send(alertMsg);
-      } catch (e) {}
+        const parentCategory = channel ? channel.parentId : null;
+        testChan = await guild.channels.create({
+          name: `test-${nextPlayer.username.toLowerCase()}`,
+          type: ChannelType.GuildText,
+          parent: parentCategory || undefined,
+          permissionOverwrites: [
+            {
+              id: guild.id,
+              deny: [PermissionFlagsBits.ViewChannel]
+            },
+            {
+              id: nextPlayer.userId,
+              allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory]
+            },
+            {
+              id: user.id,
+              allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory]
+            },
+            {
+              id: client.user.id,
+              allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory, PermissionFlagsBits.ManageChannels]
+            }
+          ]
+        });
 
-      return interaction.editReply({ content: `✅ Called **<@${nextPlayer.userId}>**! ${data.queue.length} player(s) remaining in queue.` });
+        const closeBtnRow = new ActionRowBuilder().addComponents(
+          new ButtonBuilder()
+            .setCustomId(`btn_close_test_${nextPlayer.userId}_${nextPlayer.username}`)
+            .setLabel('Close Test & Submit Result')
+            .setStyle(ButtonStyle.Danger)
+            .setEmoji('📝')
+        );
+
+        await testChan.send({
+          content: `⚔️ **Tier Test Started for <@${nextPlayer.userId}> (\`${nextPlayer.username}\`)!**\nTester: <@${user.id}>\n\nWhen the fight is complete, click **Close Test & Submit Result** below to fill out scores and log results.`,
+          components: [closeBtnRow]
+        });
+      } catch (e) {
+        console.warn('Private test channel creation note:', e.message);
+      }
+
+      const chanMention = testChan ? `<#${testChan.id}>` : 'a private channel';
+      return interaction.editReply({ content: `✅ Created private test channel ${chanMention} for **<@${nextPlayer.userId}>**! ${data.queue.length} player(s) remaining in queue.` });
     }
 
     if (commandName === 'clearqueue') {
@@ -258,8 +298,64 @@ async function handleQueueCommand(interaction) {
 }
 
 async function handleQueueButton(interaction) {
+  const { customId, user, client } = interaction;
+
+  if (customId.startsWith('btn_close_test_')) {
+    const parts = customId.split('_');
+    const targetUserId = parts[3] || user.id;
+    const targetUsername = parts.slice(4).join('_') || 'Player';
+
+    const modal = new ModalBuilder()
+      .setCustomId(`modal_submit_test_${targetUserId}_${targetUsername}`)
+      .setTitle(`Tier Test Results: ${targetUsername}`);
+
+    const inputIgn = new TextInputBuilder()
+      .setCustomId('field_ign')
+      .setLabel('Player Username / IGN')
+      .setValue(targetUsername)
+      .setStyle(TextInputStyle.Short)
+      .setRequired(true);
+
+    const inputKit = new TextInputBuilder()
+      .setCustomId('field_kit')
+      .setLabel('Kit Category (e.g. Dragonhide KB, Emerald)')
+      .setValue('Dragonhide KB')
+      .setStyle(TextInputStyle.Short)
+      .setRequired(true);
+
+    const inputOutcome = new TextInputBuilder()
+      .setCustomId('field_outcome')
+      .setLabel('Rank Earned / Outcome (e.g. HT5, Failed)')
+      .setValue('HT5')
+      .setStyle(TextInputStyle.Short)
+      .setRequired(true);
+
+    const inputPrevRank = new TextInputBuilder()
+      .setCustomId('field_prev_rank')
+      .setLabel('Previous Rank (e.g. Low Tier 4, Unranked)')
+      .setValue('Unranked')
+      .setStyle(TextInputStyle.Short)
+      .setRequired(true);
+
+    const inputScore = new TextInputBuilder()
+      .setCustomId('field_score')
+      .setLabel('Fight Score (e.g. 5 - 0)')
+      .setValue('5 - 0')
+      .setStyle(TextInputStyle.Short)
+      .setRequired(true);
+
+    modal.addComponents(
+      new ActionRowBuilder().addComponents(inputIgn),
+      new ActionRowBuilder().addComponents(inputKit),
+      new ActionRowBuilder().addComponents(inputOutcome),
+      new ActionRowBuilder().addComponents(inputPrevRank),
+      new ActionRowBuilder().addComponents(inputScore)
+    );
+
+    return interaction.showModal(modal);
+  }
+
   await interaction.deferReply({ ephemeral: true });
-  const { customId, user, member, client } = interaction;
   const data = await getQueueData();
 
   if (customId === 'btn_join_queue') {
@@ -295,10 +391,85 @@ async function handleQueueButton(interaction) {
   }
 }
 
+async function handleQueueModal(interaction) {
+  if (!interaction.customId.startsWith('modal_submit_test_')) return;
+
+  await interaction.deferReply({ ephemeral: true });
+
+  try {
+    const parts = interaction.customId.split('_');
+    const targetUserId = parts[3];
+
+    const ign = interaction.fields.getTextInputValue('field_ign').trim();
+    const kit = interaction.fields.getTextInputValue('field_kit').trim();
+    const outcome = interaction.fields.getTextInputValue('field_outcome').trim();
+    const prevRank = interaction.fields.getTextInputValue('field_prev_rank').trim();
+    const score = interaction.fields.getTextInputValue('field_score').trim();
+
+    const isFailed = outcome.toLowerCase().includes('fail');
+    const cleanTier = (outcome.match(/[HR]?LT\d|[HR]?HT\d/i) || [outcome])[0].toUpperCase();
+
+    // 1. Patch Rankings
+    const rankings = await db.getFullRankings();
+    if (!isFailed && cleanTier) {
+      if (!rankings[kit]) rankings[kit] = {};
+      for (const t in rankings[kit]) {
+        if (Array.isArray(rankings[kit][t])) {
+          rankings[kit][t] = rankings[kit][t].filter(p => (typeof p === 'object' ? p.name : p || '').toString().toLowerCase() !== ign.toLowerCase());
+        }
+      }
+      if (!rankings[kit][cleanTier]) rankings[kit][cleanTier] = [];
+      if (!rankings[kit][cleanTier].includes(ign)) rankings[kit][cleanTier].push(ign);
+
+      db.recomputeOverallPoints(rankings);
+      db.saveLocalRankings(rankings);
+      await db.patchDoc('rankings', kit, rankings[kit]);
+      await db.patchDoc('rankings', 'players_meta', { players: rankings.Players || [] });
+    }
+
+    // 2. Build test result embed
+    const embed = buildTestResultEmbed({
+      player: ign,
+      tester: interaction.user.id,
+      region: 'NA',
+      prevRank,
+      rankEarned: outcome,
+      kit,
+      score
+    });
+
+    // 3. Post to tiertesters chat (1488183052407406723)
+    let postedNote = '';
+    try {
+      const targetChan = await interaction.client.channels.fetch(TARGET_RESULTS_CHANNEL).catch(() => null);
+      if (targetChan) {
+        await targetChan.send({ embeds: [embed] });
+        postedNote = ` and result embed posted to <#${TARGET_RESULTS_CHANNEL}>`;
+      }
+    } catch (e) {
+      console.warn('Error sending test result to tiertesters channel:', e.message);
+    }
+
+    // 4. Confirm to tester and schedule channel deletion in 5 seconds
+    await interaction.editReply({ content: `✅ **Tier test submitted** for **${ign}**${postedNote}! Deleting this channel in 5 seconds...` });
+
+    setTimeout(() => {
+      if (interaction.channel && interaction.channel.deletable) {
+        interaction.channel.delete().catch(() => null);
+      }
+    }, 5000);
+  } catch (err) {
+    console.error('Error handling queue modal submission:', err);
+    return interaction.editReply({ content: `❌ Error submitting test result: ${err.message}` });
+  }
+}
+
 module.exports = {
   queueCommands,
   handleQueueCommand,
   handleQueueButton,
+  handleQueueModal,
   updateQueuePanel,
   TARGET_CHANNEL_ID
 };
+
