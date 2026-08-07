@@ -388,6 +388,7 @@ async function loadRankingsData() {
 
     normalizeDataKits(DATA);
     computeOverallPoints();
+    window.DATA = DATA;
     renderCurrentTab();
   } catch (err) {
     console.error("Failed to load rankings data:", err);
