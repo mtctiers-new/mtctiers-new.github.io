@@ -86,7 +86,8 @@ async function sha256Hex(str) {
 const EMAIL_TO_PLAYER = {
   'ziadn6b@gmail.com': 'ziadlive',
   'v4n1shedytoffical@gmail.com': 'vorthexis',
-  'v41nshedytoffical@gmail.com': 'vorthexis'
+  'v41nshedytoffical@gmail.com': 'vorthexis',
+  'itzx9jm@gmail.com': 'x9jm'
 };
 
 async function checkWhitelistStatus(email) {
