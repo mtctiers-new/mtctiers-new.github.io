@@ -18,11 +18,15 @@
       --bg-card: rgba(18, 20, 32, 0.75);
       --border-glass: rgba(255, 255, 255, 0.08);
       --cyan: #00eeff;
+      --cyan-rgb: 0, 238, 255;
       --cyan-glow: rgba(0, 238, 255, 0.25);
       --emerald: #10b981;
+      --emerald-rgb: 16, 185, 129;
       --emerald-glow: rgba(16, 185, 129, 0.25);
       --amber: #f59e0b;
+      --amber-rgb: 245, 158, 11;
       --crimson: #ef4444;
+      --crimson-rgb: 239, 68, 68;
       --text-main: #f3f4f6;
       --text-muted: #9ca3af;
       --font-main: 'Inter', sans-serif;
@@ -426,6 +430,29 @@
         </div>
       </div>
 
+      <!-- 1b. App Script Integrity -->
+      <div class="service-card" id="card-appjs">
+        <div class="service-header">
+          <div class="service-name-wrap">
+            <span class="service-icon">📜</span>
+            <div>
+              <div class="service-name">Web App Script (app.js)</div>
+              <div class="service-meta" id="meta-appjs">Syntax Check: Checking...</div>
+            </div>
+          </div>
+          <div class="service-status-tag" id="status-appjs">
+            <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--emerald);"></span>
+            <span>Checking...</span>
+          </div>
+        </div>
+        <div class="uptime-bar-wrap" id="bar-appjs"></div>
+        <div class="uptime-footer">
+          <span>90 days ago</span>
+          <span id="uptime-pct-appjs">99.99% Uptime</span>
+          <span>Today</span>
+        </div>
+      </div>
+
       <!-- 2. Firebase Firestore Database -->
       <div class="service-card" id="card-firestore">
         <div class="service-header">
@@ -537,6 +564,7 @@
     }
 
     buildUptimeBars('bar-website');
+    buildUptimeBars('bar-appjs');
     buildUptimeBars('bar-firestore');
     buildUptimeBars('bar-bot');
     buildUptimeBars('bar-auth');
@@ -571,6 +599,28 @@
         }
       } catch (e) {
         updateServiceTag('website', 'Unreachable', 'crimson', 'Offline');
+        allOk = false;
+      }
+
+      // 1b. App.js Syntax Integrity Check
+      try {
+        const jsRes = await fetch(`app.js?v=${Date.now()}`);
+        const jsText = await jsRes.text();
+        try {
+          new Function(jsText); // parses without executing — throws on syntax errors
+          updateServiceTag('appjs', 'Operational', 'emerald', 'Syntax Check: Passed');
+          markTodayBar('bar-appjs', 'emerald');
+          setUptimePct('uptime-pct-appjs', 99.99);
+        } catch (parseErr) {
+          updateServiceTag('appjs', 'Broken', 'crimson', 'Syntax Check: Failed');
+          markTodayBar('bar-appjs', 'crimson');
+          setUptimePct('uptime-pct-appjs', 98.33);
+          allOk = false;
+        }
+      } catch (e) {
+        updateServiceTag('appjs', 'Unreachable', 'crimson', 'Could not fetch app.js');
+        markTodayBar('bar-appjs', 'crimson');
+        setUptimePct('uptime-pct-appjs', 98.33);
         allOk = false;
       }
 
@@ -633,14 +683,28 @@
       }
     }
 
+    function markTodayBar(containerId, colorVar) {
+      const el = document.getElementById(containerId);
+      if (!el) return;
+      const bars = el.querySelectorAll('.bar-day');
+      if (!bars.length) return;
+      const todayBar = bars[bars.length - 1];
+      todayBar.style.background = `var(--${colorVar})`;
+    }
+
+    function setUptimePct(elId, pct) {
+      const el = document.getElementById(elId);
+      if (el) el.innerText = `${pct.toFixed(2)}% Uptime`;
+    }
+
     function updateServiceTag(serviceId, statusText, colorVar, metaText) {
       const tagEl = document.getElementById(`status-${serviceId}`);
       const metaEl = document.getElementById(`meta-${serviceId}`);
 
       if (tagEl) {
         tagEl.style.color = `var(--${colorVar})`;
-        tagEl.style.background = `rgba(var(--${colorVar}), 0.15)`;
-        tagEl.style.borderColor = `rgba(var(--${colorVar}), 0.3)`;
+        tagEl.style.background = `rgba(var(--${colorVar}-rgb), 0.15)`;
+        tagEl.style.borderColor = `rgba(var(--${colorVar}-rgb), 0.3)`;
         tagEl.innerHTML = `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--${colorVar});"></span><span>${statusText}</span>`;
       }
       if (metaEl && metaText) {
