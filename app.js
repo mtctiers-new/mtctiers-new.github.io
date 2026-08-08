@@ -849,8 +849,6 @@ function duelDescLine(d, playerName) {
   return `${kit}${tier ? ' · ' + tier : ''}`.trim();
 }
 
-let DUELS_REGISTRY = new Map();
-
 function openDuelPopupById(id, perspective) {
   const d = DUELS_REGISTRY.get(String(id));
   if (!d) return;
