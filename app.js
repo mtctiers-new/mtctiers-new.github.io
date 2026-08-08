@@ -70,7 +70,8 @@ let WHITELIST_ENTRIES = [
   { label: 'v41nshedytoffical@gmail.com (Admin)', hash: 'c0e9b169d9f8e920cdc57277caccbaa160e1e2b7d886952bb027b51330f5bb16', role: 'admin', assignedPlayer: '*' },
   { label: 'vorthexis (Admin)', hash: '3eef6721a50faedfaaefa7c075faa4fb604f6b59dbed9b147ac953051934b452', role: 'admin', assignedPlayer: 'vorthexis' },
   { label: 'v41nshed (Admin)', hash: 'b3339600b6cca216725b00048b34f873035b7e3c9d2f100ba33828adc045fa6f', role: 'admin', assignedPlayer: 'vorthexis' },
-  { label: 'v4n1shed (Admin)', hash: '45fa8d30db1adfac35b83544615eb76462ea55c0ed65069d7b584ad72b42d165', role: 'admin', assignedPlayer: 'vorthexis' }
+  { label: 'v4n1shed (Admin)', hash: '45fa8d30db1adfac35b83544615eb76462ea55c0ed65069d7b584ad72b42d165', role: 'admin', assignedPlayer: 'vorthexis' },
+  { label: 'itzx9jm@gmail.com (Admin)', hash: 'c949aec5c7f3b20a7c5752fef10e2a9a5ee8be71a1100a37959f88a33a78aa62', role: 'admin', assignedPlayer: '*' }
 ];
 
 let CURRENT_ROLE = null;
@@ -1037,7 +1038,7 @@ async function renderDuelsView(playerFilter) {
 
 async function renderProfileDuels(playerName) {
   document.querySelectorAll('.profile-duel-section').forEach(el => el.remove());
-  const metaBox = document.querySelector('.player-meta-box');
+  const bioCard = document.querySelector('.player-bio-card');
 
   try {
     let duels = await fetchDuelsFromFirestore(playerName);
@@ -1066,7 +1067,7 @@ async function renderProfileDuels(playerName) {
       pWLEl.innerText = `${wins}W / ${losses}L`;
     }
 
-    if (!metaBox || !duels || !duels.length) return;
+    if (!bioCard || !duels || !duels.length) return;
 
     const d = duels[0];
     const duelId = String(d.id || d.message_id || `latest_${playerName}`);
@@ -1092,7 +1093,7 @@ async function renderProfileDuels(playerName) {
       </div>
     `;
 
-    metaBox.appendChild(section);
+    bioCard.insertAdjacentElement('afterend', section);
   } catch (e) {
     console.warn("Duel history fetch note:", e.message);
   }
@@ -1166,7 +1167,7 @@ async function openProfile(name) {
     ? pDetail.accentColor.trim() 
     : '#00eeff';
 
-  const pCard = document.querySelector('.profile-modal-card');
+  const pCard = document.getElementById('profileModal');
   if (pCard) {
     pCard.style.borderColor = accent;
     pCard.style.boxShadow = `0 0 35px ${accent}44`;
