@@ -86,10 +86,36 @@
             style="width:16px;height:16px;margin-right:6px;vertical-align:middle;">
           <span>LOGIN WITH GOOGLE</span>
         </button>
-        <div id="userProfile" class="user-profile" style="display:none;" onclick="logoutUser()" title="Click to Logout">
+        <div id="userProfile" class="user-profile" style="display:none;" onclick="toggleUserAccountMenu(event)" title="Account Options">
           <img id="userAvatar" src="assets/mtctiers_default_skin.png" class="user-avatar" alt="User">
           <span id="userName" class="user-name"></span>
           <span id="adminTag" class="admin-tag" style="display:none;">ADMIN</span>
+          <span class="menu-caret">▾</span>
+
+          <div id="userAccountMenu" class="user-account-menu" onclick="event.stopPropagation()">
+            <div class="user-menu-header">
+              <div class="user-menu-name" id="menuUserName">User</div>
+              <div class="user-menu-email" id="menuUserEmail">user@gmail.com</div>
+            </div>
+            <div class="user-menu-divider"></div>
+            <div class="user-menu-item" onclick="openMyPlayerProfile()">
+              <span class="user-menu-icon">👤</span>
+              <span>View My Profile</span>
+            </div>
+            <div class="user-menu-item" onclick="openMyProfileCustomization()">
+              <span class="user-menu-icon">✏️</span>
+              <span>Profile Settings (PFP, Banner, Emoji)</span>
+            </div>
+            <div class="user-menu-item" id="menu2faItem" onclick="openMy2faSecurity()">
+              <span class="user-menu-icon">🔐</span>
+              <span>2FA Mobile Security</span>
+            </div>
+            <div class="user-menu-divider"></div>
+            <div class="user-menu-item logout" onclick="logoutUser()">
+              <span class="user-menu-icon">🚪</span>
+              <span>Logout</span>
+            </div>
+          </div>
         </div>
       </div>
       <div class="search-wrap">
@@ -689,7 +715,7 @@
 
   <div id="toast" class="toast">Link copied to clipboard!</div>
 
-  <script src="app.js?v=20260810_pwa"></script>
+  <script src="app.js?v=20260810_menu_fixed"></script>
 </body>
 
 </html>
