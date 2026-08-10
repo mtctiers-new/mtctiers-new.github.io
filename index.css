@@ -2581,5 +2581,172 @@ body {
   vertical-align: middle;
 }
 
+/* 🚀 MOBILE OPTIMIZATIONS & LOW-END GPU PERFORMANCE FIXES */
+.overall-row, .tier-card, .podium-card, .duel-row, .hof-card {
+  contain: layout style;
+  touch-action: manipulation;
+}
+
+@media (max-width: 768px) {
+  /* Performance: Disable expensive blur filters on low-end mobile processors */
+  *, *::before, *::after {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+
+  body {
+    overflow-x: hidden;
+  }
+
+  /* Compact Navbar */
+  .navbar {
+    padding: 8px 12px;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .nav-logo {
+    font-size: 1.1rem;
+  }
+
+  .nav-right {
+    gap: 6px;
+    width: 100%;
+    justify-content: space-between;
+    margin-top: 4px;
+  }
+
+  .search-wrap {
+    flex: 1;
+    max-width: none;
+  }
+
+  .search-input {
+    width: 100%;
+    padding: 6px 12px 6px 30px;
+    font-size: 0.8rem;
+  }
+
+  /* Horizontal Scrollable Kit Bar */
+  .kit-bar {
+    display: flex;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 6px 8px;
+    gap: 6px;
+    scrollbar-width: none;
+  }
+  .kit-bar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .kit-btn {
+    padding: 6px 12px;
+    font-size: 0.72rem;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  /* Responsive Podium */
+  .podium-container {
+    gap: 8px;
+    padding: 12px 6px;
+  }
+
+  .podium-card {
+    padding: 10px 6px;
+  }
+
+  .podium-avatar {
+    width: 52px;
+    height: 52px;
+  }
+
+  .podium-name {
+    font-size: 0.8rem;
+  }
+
+  .podium-pts {
+    font-size: 0.75rem;
+  }
+
+  /* Overall Leaderboard List */
+  .overall-header {
+    font-size: 0.7rem;
+    grid-template-columns: 35px 1fr 50px 80px;
+    padding: 8px 10px;
+  }
+
+  .overall-row {
+    font-size: 0.8rem;
+    grid-template-columns: 35px 1fr 50px 80px;
+    padding: 8px 10px;
+  }
+
+  .ol-name {
+    max-width: 90px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* Tier Cards Grid */
+  .vertical-tier-cards-wrap, .tier-grid {
+    grid-template-columns: repeat(auto-fill, minmax(125px, 1fr)) !important;
+    gap: 8px !important;
+  }
+
+  .tier-card {
+    padding: 8px;
+  }
+
+  .tier-card-avatar {
+    width: 36px;
+    height: 36px;
+  }
+
+  .tier-card-name {
+    font-size: 0.78rem;
+  }
+
+  /* Duels List */
+  .duel-row {
+    padding: 10px;
+  }
+
+  .duel-p1, .duel-p2 {
+    font-size: 0.85rem;
+    max-width: 100px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* Modals Sheet for Mobile */
+  .modal-overlay {
+    padding: 10px;
+    align-items: flex-end;
+  }
+
+  .profile-modal, .submit-duel-card, .duel-popup-card {
+    width: 100% !important;
+    max-width: 100% !important;
+    max-height: 85vh !important;
+    overflow-y: auto !important;
+    border-radius: 20px 20px 0 0 !important;
+    padding: 18px 14px !important;
+    background: #0a1423 !important;
+  }
+
+  /* Dropdown Account Menu */
+  .user-account-menu {
+    right: 0;
+    left: auto;
+    width: 220px;
+    background: #0c182b;
+    border: 1px solid var(--cyan);
+  }
+}
+
 
 

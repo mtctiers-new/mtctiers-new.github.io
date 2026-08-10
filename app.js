@@ -2063,28 +2063,32 @@ async function removeEmailFromWhitelist(targetHash) {
   }
 }
 
+let searchDebounceTimer = null;
 function handleSearch(val) {
-  const popup = document.getElementById('searchPopup');
-  if (!val.trim()) {
-    popup.style.display = 'none';
-    return;
-  }
+  clearTimeout(searchDebounceTimer);
+  searchDebounceTimer = setTimeout(() => {
+    const popup = document.getElementById('searchPopup');
+    if (!val.trim()) {
+      popup.style.display = 'none';
+      return;
+    }
 
-  const matches = Object.keys(DATA.Overall || {}).filter(name => 
-    name.toLowerCase().includes(val.toLowerCase())
-  ).slice(0, 6);
+    const matches = Object.keys(DATA.Overall || {}).filter(name => 
+      name.toLowerCase().includes(val.toLowerCase())
+    ).slice(0, 6);
 
-  if (matches.length === 0) {
-    popup.innerHTML = `<div class="search-item"><span>No player found</span></div>`;
-  } else {
-    popup.innerHTML = matches.map(m => `
-      <div class="search-item" onclick="openProfile('${m}');document.getElementById('searchPopup').style.display='none';">
-        <b>${m}</b>
-        <span>VIEW PROFILE</span>
-      </div>
-    `).join('');
-  }
-  popup.style.display = 'block';
+    if (matches.length === 0) {
+      popup.innerHTML = `<div class="search-item"><span>No player found</span></div>`;
+    } else {
+      popup.innerHTML = matches.map(m => `
+        <div class="search-item" onclick="openProfile('${m}');document.getElementById('searchPopup').style.display='none';">
+          <b>${m}</b>
+          <span>VIEW PROFILE</span>
+        </div>
+      `).join('');
+    }
+    popup.style.display = 'block';
+  }, 100);
 }
 
 function copyProfileLink() {
