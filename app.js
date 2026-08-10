@@ -368,11 +368,31 @@ function normalizeDataKits(dataObj) {
 async function loadRankingsData() {
   try {
     let loadedFromFirestore = false;
+    const now = Date.now();
+    const cachedObjStr = localStorage.getItem('MTCTIERS_RANKINGS_CACHE_V2');
+    let cachedObj = null;
 
-    // 1. Fetch directly from Firebase Firestore REST API (Primary Source of Truth)
+    if (cachedObjStr) {
+      try { cachedObj = JSON.parse(cachedObjStr); } catch (e) {}
+    }
+
+    // 1. If cache is fresh (< 60s), load instantly
+    if (cachedObj && cachedObj.ts && (now - cachedObj.ts < 60000) && cachedObj.data) {
+      DATA = cachedObj.data;
+      normalizeDataKits(DATA);
+      computeOverallPoints();
+      window.DATA = DATA;
+      renderCurrentTab();
+      return;
+    }
+
+    // 2. Fetch directly from Firebase Firestore REST API
     try {
       const fsRes = await fetch("https://firestore.googleapis.com/v1/projects/mtctiers/databases/(default)/documents/rankings");
-      if (fsRes.ok) {
+      if (fsRes.status === 429) {
+        console.warn("⚠️ Firebase REST API Rate Limited (HTTP 429). Using static data/rankings.json fallback.");
+        showToast("⚠️ Serving cached data (Firebase Rate Limited)");
+      } else if (fsRes.ok) {
         const fsData = await fsRes.json();
         const docs = fsData.documents || [];
         if (docs.length) {
@@ -397,16 +417,23 @@ async function loadRankingsData() {
             }
           });
           loadedFromFirestore = true;
+          try {
+            localStorage.setItem('MTCTIERS_RANKINGS_CACHE_V2', JSON.stringify({ ts: now, data: DATA }));
+          } catch (e) {}
         }
       }
     } catch (e) {
       console.warn("Direct Firestore REST load note:", e.message);
     }
 
-    // 2. Fallback to local rankings.json only if offline/Firestore unreachable
+    // 3. Fallback to local rankings.json if offline or rate-limited
     if (!loadedFromFirestore) {
-      const res = await fetch(`data/rankings.json?v=${Date.now()}`);
-      DATA = await res.json();
+      if (cachedObj && cachedObj.data) {
+        DATA = cachedObj.data;
+      } else {
+        const res = await fetch(`data/rankings.json?v=${now}`);
+        if (res.ok) DATA = await res.json();
+      }
     }
 
     normalizeDataKits(DATA);
@@ -924,10 +951,17 @@ function dedupeAndSortDuels(duels) {
 
 async function fetchDuelsFromFirestore(playerFilter) {
   let allDuels = [];
+  const now = Date.now();
+  const cachedDuelsStr = localStorage.getItem('MTCTIERS_DUELS_CACHE_V2');
+  let cachedDuelsObj = null;
+
+  if (cachedDuelsStr) {
+    try { cachedDuelsObj = JSON.parse(cachedDuelsStr); } catch (e) {}
+  }
 
   // Load from local data/duels.json first (complete backup)
   try {
-    const res = await fetch(`data/duels.json?v=${Date.now()}`);
+    const res = await fetch(`data/duels.json?v=${now}`);
     if (res.ok) {
       const localData = await res.json();
       if (Array.isArray(localData)) allDuels.push(...localData);
@@ -941,23 +975,36 @@ async function fetchDuelsFromFirestore(playerFilter) {
     }
   } catch (e) { console.warn("Local duels.json fetch note:", e.message); }
 
-  // Merge with Firestore live duels
-  try {
-    const baseREST = "https://firestore.googleapis.com/v1/projects/mtctiers/databases/(default)/documents/duels";
-    const res = await fetch(`${baseREST}?pageSize=300`);
-    if (res.ok) {
-      const data = await res.json();
-      const docs = data.documents || [];
-      docs.forEach(doc => {
-        const rawDuels = doc.fields?.duels?.arrayValue?.values || [];
-        rawDuels.forEach(item => {
-          allDuels.push(parseFirestoreMap(item.mapValue?.fields || {}));
+  // Merge with Firestore live duels if not rate limited & cache expired (> 30s)
+  let fetchedFirestore = false;
+  if (!cachedDuelsObj || !cachedDuelsObj.ts || (now - cachedDuelsObj.ts > 30000)) {
+    try {
+      const baseREST = "https://firestore.googleapis.com/v1/projects/mtctiers/databases/(default)/documents/duels";
+      const res = await fetch(`${baseREST}?pageSize=300`);
+      if (res.status === 429) {
+        console.warn("⚠️ Firestore Duels REST Rate Limited (HTTP 429). Using cached duels.");
+      } else if (res.ok) {
+        const data = await res.json();
+        const docs = data.documents || [];
+        docs.forEach(doc => {
+          const rawDuels = doc.fields?.duels?.arrayValue?.values || [];
+          rawDuels.forEach(item => {
+            allDuels.push(parseFirestoreMap(item.mapValue?.fields || {}));
+          });
         });
-      });
-    }
-  } catch (e) { console.warn("Firestore REST duels note:", e.message); }
+        fetchedFirestore = true;
+      }
+    } catch (e) { console.warn("Firestore REST duels note:", e.message); }
+  }
+
+  if (!fetchedFirestore && cachedDuelsObj && Array.isArray(cachedDuelsObj.duels)) {
+    allDuels.push(...cachedDuelsObj.duels);
+  }
 
   const combined = dedupeAndSortDuels(allDuels);
+  try {
+    localStorage.setItem('MTCTIERS_DUELS_CACHE_V2', JSON.stringify({ ts: now, duels: combined }));
+  } catch (e) {}
 
   if (playerFilter) {
     const cleanP = playerFilter.toLowerCase().trim();

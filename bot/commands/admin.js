@@ -1,6 +1,8 @@
 const { SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits } = require('discord.js');
 const db = require('../firebase');
 const config = require('../config');
+const { uploadToCatbox } = require('../catbox');
+const LOGO_URL = 'https://mtctiers.com/assets/mtctiers.png';
 const { buildTestResultEmbed, TARGET_RESULTS_CHANNEL } = require('../manual_results');
 
 function isAdmin(interaction) {
@@ -162,7 +164,9 @@ const adminCommands = [
     .addIntegerOption(o => o.setName('player1_score').setDescription('New player 1 score').setRequired(false))
     .addIntegerOption(o => o.setName('player2_score').setDescription('New player 2 score').setRequired(false))
     .addStringOption(o => o.setName('outcome').setDescription('New outcome text').setRequired(false))
-    .addStringOption(o => o.setName('tier').setDescription('New target tier').setRequired(false))
+    .addStringOption(o => o.setName('tier').setDescription('New target tier').setRequired(false)),
+  
+  new SlashCommandBuilder().setName('ping').setDescription('Check the bot\'s latency'),
 ];
 
 async function handleAdminCommand(interaction) {
@@ -514,6 +518,9 @@ async function handleAdminCommand(interaction) {
         await db.patchDoc('duels', p2, { player: p2, duels: p2List, count: p2List.length });
       } catch (e) { console.warn('Firestore duel patch note:', e.message); }
 
+      const rawImgUrl = imgAttachment ? imgAttachment.url : null;
+      const proofUrl = rawImgUrl ? await uploadToCatbox(rawImgUrl) : null;
+
       const resultEmbed = buildTestResultEmbed({
         player: winner,
         tester: interaction.user.id,
@@ -522,7 +529,7 @@ async function handleAdminCommand(interaction) {
         rankEarned: newTierOpt || outcome,
         kit,
         score: `${s1} - ${s2}`,
-        proofUrl: imgAttachment ? imgAttachment.url : null
+        proofUrl
       });
 
       let targetChan = null;
@@ -585,6 +592,24 @@ async function handleAdminCommand(interaction) {
       await db.patchDoc('duels', player, { player, duels: doc.duels, count: doc.duels.length });
 
       return interaction.editReply({ content: `✏️ **Duel Updated**: Updated duel #${num} for **${player}** (${d.kit} · Score: ${d.player1_score} - ${d.player2_score}).` });
+    }
+
+      if (commandName === 'ping') {
+      const wsPing = Math.round(interaction.client.ws.ping);
+      const roundTrip = Date.now() - interaction.createdTimestamp;
+
+      const embed = new EmbedBuilder()
+        .setAuthor({ name: 'MTCTiers Bot Status', iconURL: LOGO_URL })
+        .setTitle('🏓 Pong!')
+        .addFields(
+          { name: 'Websocket Ping', value: `${wsPing}ms`, inline: true },
+          { name: 'Round Trip', value: `${roundTrip}ms`, inline: true }
+        )
+        .setColor(0x00eeff)
+        .setFooter({ text: 'MTCTiers Official • mtctiers.com', iconURL: LOGO_URL })
+        .setTimestamp();
+
+      return interaction.editReply({ embeds: [embed] });
     }
 
   } catch (err) {
