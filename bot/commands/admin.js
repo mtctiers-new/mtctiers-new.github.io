@@ -504,8 +504,19 @@ async function handleAdminCommand(interaction) {
       try {
         const timestamp = Date.now();
         const isoDate = new Date().toISOString().split('T')[0];
-        const recordP1 = { timestamp, date: isoDate, kit, outcome, player1: p1, player2: p2, player1_score: s1, player2_score: s2, winner, result: winner.toLowerCase() === p1.toLowerCase() ? 'Won' : 'Lost', tier: newTierOpt || '' };
-        const recordP2 = { timestamp, date: isoDate, kit, outcome, player1: p1, player2: p2, player1_score: s1, player2_score: s2, winner, result: winner.toLowerCase() === p2.toLowerCase() ? 'Won' : 'Lost', tier: newTierOpt || '' };
+
+        let totalCount = 364;
+        try {
+          const allMeta = await db.getDoc('duels', 'all_duels');
+          if (allMeta && allMeta.total_count) totalCount = allMeta.total_count;
+        } catch (e) {}
+
+        const duel_number = totalCount + 1;
+        const duelId = String(duel_number);
+        await db.patchDoc('duels', 'all_duels', { total_count: duel_number });
+
+        const recordP1 = { duel_number, id: duelId, timestamp, date: isoDate, kit, outcome, player1: p1, player2: p2, player1_score: s1, player2_score: s2, winner, result: winner.toLowerCase() === p1.toLowerCase() ? 'Won' : 'Lost', tier: newTierOpt || '' };
+        const recordP2 = { duel_number, id: duelId, timestamp, date: isoDate, kit, outcome, player1: p1, player2: p2, player1_score: s1, player2_score: s2, winner, result: winner.toLowerCase() === p2.toLowerCase() ? 'Won' : 'Lost', tier: newTierOpt || '' };
 
         const p1Doc = (await db.getDoc('duels', p1)) || { player: p1, duels: [] };
         let p1List = Array.isArray(p1Doc.duels) ? p1Doc.duels : [];

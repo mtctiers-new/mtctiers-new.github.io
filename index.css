@@ -2566,5 +2566,20 @@ body {
   font-size: 1rem;
 }
 
+/* ⚔️ DUEL NUMBER TAG STYLES */
+.duel-num-tag {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  font-weight: 800;
+  color: var(--cyan);
+  background: rgba(0, 238, 255, 0.12);
+  border: 1px solid rgba(0, 238, 255, 0.35);
+  padding: 2px 7px;
+  border-radius: 6px;
+  margin-right: 6px;
+  display: inline-block;
+  vertical-align: middle;
+}
+
 
 

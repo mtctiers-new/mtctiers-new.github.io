@@ -1203,8 +1203,10 @@ async function renderDuelsView(playerFilter) {
 
     DUELS_REGISTRY.clear();
     duels.forEach((d, i) => {
-      const duelId = String(d.id || d.message_id || `d_${i}`);
+      const duelNum = d.duel_number || d.id || (duels.length - i);
+      const duelId = String(d.id || d.duel_number || d.message_id || `d_${i}`);
       DUELS_REGISTRY.set(duelId, d);
+      DUELS_REGISTRY.set(String(duelNum), d);
 
       const perspective = playerFilter || d.player1;
       const info = duelPerspective(d, perspective);
@@ -1215,6 +1217,7 @@ async function renderDuelsView(playerFilter) {
         <div class="duel-row ${info.won ? 'won' : 'lost'}" onclick="openDuelPopupById('${duelId}', '${perspective}')">
           <div class="duel-row-top">
             <div class="duel-names">
+              <span class="duel-num-tag">#${duelNum}</span>
               <span class="duel-p1" onclick="event.stopPropagation();openProfile('${perspective}')">${perspective}</span>
               <span class="duel-vs">vs</span>
               <span class="duel-p2" onclick="event.stopPropagation();openProfile('${info.opponent}')">${info.opponent}</span>
@@ -1450,10 +1453,11 @@ function copyDuelLink(duelId, playerName) {
 }
 
 function openDuelPopupById(duelId, perspective) {
-  let duel = DUELS_REGISTRY.get(String(duelId));
+  const dStr = String(duelId).trim();
+  let duel = DUELS_REGISTRY.get(dStr);
   if (!duel) {
     for (const [k, v] of DUELS_REGISTRY.entries()) {
-      if (String(v.id || v.timestamp || v.message_id) === String(duelId)) {
+      if (String(v.duel_number) === dStr || String(v.id) === dStr || String(v.message_id) === dStr || String(v.timestamp) === dStr) {
         duel = v;
         break;
       }
@@ -1470,7 +1474,7 @@ function openDuelPopup(duel, perspective) {
   const p = perspective || duel.player1;
   const info = duelPerspective(duel, p);
   const dateStr = new Date(duel.timestamp || duel.created_at * 1000 || Date.now()).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' });
-  const duelId = String(duel.id || duel.timestamp || duel.message_id || 'N/A');
+  const duelNum = duel.duel_number || duel.id || duel.message_id || 'N/A';
 
   let modal = document.getElementById('duelPopupModalOverlay');
   if (!modal) {
@@ -1485,8 +1489,8 @@ function openDuelPopup(duel, perspective) {
     <div class="modal-card duel-popup-card" style="max-width:480px;border-color:var(--cyan);box-shadow:0 0 35px rgba(0,238,255,0.35);background:rgba(10,20,35,0.95);backdrop-filter:blur(16px);border-radius:20px;padding:24px;position:relative;">
       <button class="modal-close-btn" style="position:absolute;top:16px;right:16px;background:none;border:none;color:#aaa;font-size:1.5rem;cursor:pointer;" onclick="closeDuelPopup()">&times;</button>
       <div style="font-family:var(--font-heading);font-weight:900;font-size:1.3rem;color:var(--cyan);margin-bottom:4px;display:flex;align-items:center;justify-content:space-between;">
-        <span>⚔️ DUEL DETAILS</span>
-        <span style="font-size:0.8rem;color:var(--text-muted);font-weight:600;">ID: #${duelId}</span>
+        <span>⚔️ DUEL #${duelNum}</span>
+        <span style="font-size:0.8rem;color:var(--text-muted);font-weight:600;">ID: #${duelNum}</span>
       </div>
       <div style="font-family:var(--font-heading);font-size:0.85rem;color:var(--text-muted);margin-bottom:16px;">${dateStr}</div>
 
@@ -1522,14 +1526,14 @@ function openDuelPopup(duel, perspective) {
       ` : ''}
 
       <div style="display:flex;gap:10px;">
-        <button class="btn btn-secondary" style="flex:1;padding:10px 16px;" onclick="copyDuelLink('${duelId}', '${p}')">🔗 Copy Direct Link</button>
+        <button class="btn btn-secondary" style="flex:1;padding:10px 16px;" onclick="copyDuelLink('${duelNum}', '${p}')">🔗 Copy Direct Link</button>
         <button class="btn btn-primary" style="flex:1;padding:10px 16px;" onclick="closeDuelPopup()">Close</button>
       </div>
     </div>
   `;
 
   if (window.history && window.history.replaceState) {
-    window.history.replaceState(null, '', `?tab=duels&player=${encodeURIComponent(p)}&duel=${encodeURIComponent(duelId)}`);
+    window.history.replaceState(null, '', `?tab=duels&player=${encodeURIComponent(p)}&duel=${encodeURIComponent(duelNum)}`);
   }
 
   modal.classList.add('active');
@@ -1568,7 +1572,11 @@ async function handleUrlParamsOnLoad() {
     else if (!rawHash.includes('=')) targetPlayer = rawHash;
   }
 
-  if (targetTab === 'duels') {
+  if (targetDuelId) {
+    switchTab('duels');
+    await renderDuelsView(targetPlayer);
+    openDuelPopupById(targetDuelId, targetPlayer);
+  } else if (targetTab === 'duels') {
     switchTab('duels');
     await renderDuelsView(targetPlayer);
   } else if (targetPlayer) {
@@ -1578,17 +1586,6 @@ async function handleUrlParamsOnLoad() {
         openProfile(cleanName);
       }, 200);
     }
-  }
-
-  if (targetDuelId) {
-    setTimeout(async () => {
-      const duels = await fetchDuelsFromFirestore(targetPlayer);
-      duels.forEach(d => {
-        const dKey = String(d.id || d.timestamp || d.message_id);
-        DUELS_REGISTRY.set(dKey, d);
-      });
-      openDuelPopupById(targetDuelId, targetPlayer);
-    }, 400);
   }
 }
 
