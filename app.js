@@ -2443,23 +2443,39 @@ function regenerate2faSecret(account) {
 /* 📲 PWA EVENT LISTENERS & SERVICE WORKER */
 let deferredPwaPrompt = null;
 
-function isPwaInstalled() {
+function isCurrentDeviceMobile() {
+  return window.innerWidth <= 768 || /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+}
+
+function isPwaInstalledOnCurrentDevice() {
   const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
-  const isLocalStorageInstalled = localStorage.getItem('pwa_app_installed') === 'true';
-  return isStandalone || isLocalStorageInstalled;
+  if (isStandalone) return true;
+
+  const onMobile = isCurrentDeviceMobile();
+  const key = onMobile ? 'pwa_installed_mobile' : 'pwa_installed_pc';
+  return localStorage.getItem(key) === 'true';
 }
 
 function checkAppInstalledState() {
-  if (isPwaInstalled()) {
-    const pwaBtn = document.getElementById('pwaInstallBtn');
-    const pwaBanner = document.getElementById('pwaBanner');
+  const pwaBtn = document.getElementById('pwaInstallBtn');
+  const pwaBanner = document.getElementById('pwaBanner');
+
+  if (isPwaInstalledOnCurrentDevice()) {
     if (pwaBtn) pwaBtn.style.display = 'none';
     if (pwaBanner) pwaBanner.style.display = 'none';
+  } else {
+    if (deferredPwaPrompt) {
+      if (pwaBtn) pwaBtn.style.display = 'inline-flex';
+      if (pwaBanner && !localStorage.getItem('pwa_banner_closed')) {
+        pwaBanner.style.display = 'block';
+      }
+    }
   }
 }
 
 window.addEventListener('appinstalled', () => {
-  localStorage.setItem('pwa_app_installed', 'true');
+  const key = isCurrentDeviceMobile() ? 'pwa_installed_mobile' : 'pwa_installed_pc';
+  localStorage.setItem(key, 'true');
   showToast('🎉 MTCTiers App Installed Successfully!');
   checkAppInstalledState();
 });
@@ -2467,7 +2483,7 @@ window.addEventListener('appinstalled', () => {
 window.addEventListener('beforeinstallprompt', (e) => {
   e.preventDefault();
   deferredPwaPrompt = e;
-  if (isPwaInstalled()) {
+  if (isPwaInstalledOnCurrentDevice()) {
     checkAppInstalledState();
     return;
   }
@@ -2484,7 +2500,8 @@ function promptPwaInstall() {
     deferredPwaPrompt.prompt();
     deferredPwaPrompt.userChoice.then((choiceResult) => {
       if (choiceResult.outcome === 'accepted') {
-        localStorage.setItem('pwa_app_installed', 'true');
+        const key = isCurrentDeviceMobile() ? 'pwa_installed_mobile' : 'pwa_installed_pc';
+        localStorage.setItem(key, 'true');
         showToast('🎉 MTCTiers App Installed!');
         checkAppInstalledState();
       }
