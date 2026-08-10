@@ -29,7 +29,6 @@ try {
       const userName = document.getElementById('userName');
       const adminTag = document.getElementById('adminTag');
       const adminDuelBtn = document.getElementById('adminDuelBtn');
-      const nav2fa = document.getElementById('nav-2fa');
       const mnav2fa = document.getElementById('mnav-2fa');
 
       if (user) {
@@ -37,7 +36,6 @@ try {
         if (userProfile) userProfile.style.display = 'flex';
         if (userAvatar) userAvatar.src = user.photoURL || 'assets/mtctiers_default_skin.png';
         if (userName) userName.innerText = user.displayName || user.email.split('@')[0];
-        if (nav2fa) nav2fa.style.display = 'inline-block';
         if (mnav2fa) mnav2fa.style.display = 'flex';
 
         await checkWhitelistStatus(user.email);
@@ -61,7 +59,6 @@ try {
         if (adminTag) adminTag.style.display = 'none';
         if (adminDuelBtn) adminDuelBtn.style.display = 'none';
         if (adminDashBtn) adminDashBtn.style.display = 'none';
-        if (nav2fa) nav2fa.style.display = 'none';
         if (mnav2fa) mnav2fa.style.display = 'none';
         if (CURRENT_TAB === '2fa') switchTab('home');
       }
@@ -482,11 +479,22 @@ function computeOverallPoints() {
   }
 }
 
+function isMobileDevice() {
+  return window.innerWidth <= 768 || /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+}
+
 function switchTab(tab) {
-  if (tab === '2fa' && !CURRENT_USER) {
-    showToast("🔒 2FA Authenticator requires login. Please sign in with Google!");
-    switchTab('home');
-    return;
+  if (tab === '2fa') {
+    if (!CURRENT_USER) {
+      showToast("🔒 2FA Authenticator requires login. Please sign in with Google!");
+      switchTab('home');
+      return;
+    }
+    if (!isMobileDevice()) {
+      showToast("📱 2FA Authenticator is Mobile Only! Open MTCTiers on your phone.");
+      switchTab('home');
+      return;
+    }
   }
 
   CURRENT_TAB = tab;
