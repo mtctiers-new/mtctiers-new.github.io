@@ -2424,5 +2424,50 @@ body {
   display: block;
 }
 
+/* 🎨 CUSTOM PROFILE EMOTES STYLES */
+.emote-picker-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  background: rgba(10, 20, 35, 0.8);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 8px;
+  max-height: 100px;
+  overflow-y: auto;
+}
+
+.emote-option {
+  font-size: 1.25rem;
+  padding: 4px 8px;
+  border-radius: 8px;
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid transparent;
+  transition: all 0.2s ease;
+  user-select: none;
+}
+
+.emote-option:hover, .emote-option.selected {
+  background: rgba(0, 238, 255, 0.2);
+  border-color: var(--cyan);
+  transform: scale(1.15);
+  box-shadow: 0 0 10px rgba(0, 238, 255, 0.4);
+}
+
+.profile-custom-emote {
+  font-size: 1.5rem;
+  margin-left: 8px;
+  vertical-align: middle;
+  display: inline-block;
+  animation: pulseEmote 2s infinite ease-in-out;
+  filter: drop-shadow(0 0 8px rgba(0, 238, 255, 0.6));
+}
+
+@keyframes pulseEmote {
+  0%, 100% { transform: scale(1); filter: drop-shadow(0 0 8px rgba(0, 238, 255, 0.6)); }
+  50% { transform: scale(1.15); filter: drop-shadow(0 0 14px rgba(0, 238, 255, 0.9)); }
+}
+
 
 

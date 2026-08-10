@@ -1258,7 +1258,9 @@ async function openProfile(name) {
   }
   const nameEl = document.getElementById('pName');
   if (nameEl) {
-    nameEl.innerText = name;
+    const customEmote = (pDetail.customEmote || pDetail.emote || '').trim();
+    const emoteHtml = customEmote ? `<span class="profile-custom-emote" title="Custom Profile Emote">${escapeHTML(customEmote)}</span>` : '';
+    nameEl.innerHTML = `${escapeHTML(name)}${emoteHtml}`;
     nameEl.style.color = accent;
   }
 
@@ -1693,17 +1695,28 @@ async function submitDuelFromSite() {
   }
 }
 
+function selectProfileEmote(emoji) {
+  const input = document.getElementById('epEmote');
+  if (input) input.value = emoji;
+  document.querySelectorAll('.emote-option').forEach(el => {
+    el.classList.toggle('selected', el.innerText.trim() === emoji || (emoji === '' && el.innerText.includes('None')));
+  });
+}
+
 function openEditProfileModal() {
   if (!CURRENT_PLAYER) return;
-  const pDetail = getPlayerMeta(CURRENT_PLAYER);
 
+  const pDetail = getPlayerMeta(CURRENT_PLAYER);
   document.getElementById('epSub').innerText = `Editing profile for ${CURRENT_PLAYER}`;
   document.getElementById('epSkinUrl').value = pDetail.skinUrl || '';
   document.getElementById('epBannerUrl').value = pDetail.bannerUrl || '';
+  document.getElementById('epEmote').value = pDetail.customEmote || pDetail.emote || '';
   document.getElementById('epColor').value = pDetail.accentColor || '#00eeff';
   document.getElementById('epLfm').value = pDetail.lfm ? 'ON' : 'OFF';
   document.getElementById('epRival').value = pDetail.rival || '';
   document.getElementById('epDesc').value = pDetail.description || '';
+
+  selectProfileEmote(pDetail.customEmote || pDetail.emote || '');
 
   document.getElementById('editProfileModalOverlay').classList.add('active');
 }
@@ -1730,6 +1743,7 @@ async function saveProfileCustomization() {
 
   const rawSkin = document.getElementById('epSkinUrl').value.trim();
   const rawBanner = document.getElementById('epBannerUrl').value.trim();
+  const rawEmote = document.getElementById('epEmote').value.trim();
   const accentColor = document.getElementById('epColor').value;
   const lfm = document.getElementById('epLfm').value === 'ON';
   const rawRival = document.getElementById('epRival').value.trim();
@@ -1746,6 +1760,7 @@ async function saveProfileCustomization() {
     return alert("Invalid Banner Image URL! Must start with http:// or https://");
   }
 
+  const customEmote = escapeHTML(rawEmote).slice(0, 10);
   const rival = escapeHTML(rawRival).slice(0, 50);
   const description = escapeHTML(rawDesc).slice(0, 500);
 
@@ -1757,6 +1772,7 @@ async function saveProfileCustomization() {
     name: CURRENT_PLAYER,
     skinUrl,
     bannerUrl,
+    customEmote,
     accentColor: /^#[0-9a-fA-F]{6}$/.test(accentColor) ? accentColor : '#00eeff',
     lfm,
     rival,

@@ -1,13 +1,16 @@
 {
-  "name": "MTCTiers Mobile & PC App",
+  "id": "https://mtctiers.com",
+  "name": "MTCTiers Official App",
   "short_name": "MTCTiers",
   "description": "Official MTCTiers Application for MultiCraft PvP Rankings, Duels & 2FA Account Security",
   "start_url": "/index.html?source=pwa",
   "scope": "/",
   "display": "standalone",
+  "display_override": ["standalone", "minimal-ui", "browser"],
   "orientation": "any",
   "background_color": "#0a1423",
   "theme_color": "#00eeff",
+  "prefer_related_applications": false,
   "categories": ["games", "utilities", "entertainment"],
   "icons": [
     {
@@ -25,7 +28,7 @@
   ],
   "shortcuts": [
     {
-      "name": "Overal Rankings",
+      "name": "Overall Rankings",
       "short_name": "Rankings",
       "description": "View overall MTCTiers player leaderboards",
       "url": "/index.html?tab=home"
