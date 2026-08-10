@@ -2556,6 +2556,10 @@ function regenerate2faSecret(account) {
 /* 📲 PWA EVENT LISTENERS & SERVICE WORKER */
 let deferredPwaPrompt = null;
 
+function isIosDevice() {
+  return /iPhone|iPad|iPod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+}
+
 function isCurrentDeviceMobile() {
   return window.innerWidth <= 768 || /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 }
@@ -2577,7 +2581,8 @@ function checkAppInstalledState() {
     if (pwaBtn) pwaBtn.style.display = 'none';
     if (pwaBanner) pwaBanner.style.display = 'none';
   } else {
-    if (deferredPwaPrompt) {
+    const shouldShow = deferredPwaPrompt || isIosDevice() || isCurrentDeviceMobile();
+    if (shouldShow) {
       if (pwaBtn) pwaBtn.style.display = 'inline-flex';
       if (pwaBanner && !localStorage.getItem('pwa_banner_closed')) {
         pwaBanner.style.display = 'block';
@@ -2620,8 +2625,10 @@ function promptPwaInstall() {
       }
       deferredPwaPrompt = null;
     });
+  } else if (isIosDevice()) {
+    alert('📱 How to install MTCTiers App on iPhone / iPad:\n\n1. Tap the Share button (square with arrow ↑) at the bottom of Safari.\n2. Scroll down and tap "Add to Home Screen" ➕\n3. Tap "Add" in the top right corner!');
   } else {
-    showToast('📱 To install on iOS Safari: Tap Share ➔ "Add to Home Screen"');
+    showToast('📱 Tap browser menu ➔ "Add to Home Screen" or "Install App"');
   }
 }
 
