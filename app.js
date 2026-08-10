@@ -272,6 +272,7 @@ let CURRENT_PLAYER = null;
 
 document.addEventListener('DOMContentLoaded', async () => {
   initMusicPlayer();
+  checkAppInstalledState();
   await loadRankingsData();
   handleUrlParamsOnLoad();
 });
@@ -2426,9 +2427,34 @@ function regenerate2faSecret(account) {
 /* 📲 PWA EVENT LISTENERS & SERVICE WORKER */
 let deferredPwaPrompt = null;
 
+function isPwaInstalled() {
+  const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+  const isLocalStorageInstalled = localStorage.getItem('pwa_app_installed') === 'true';
+  return isStandalone || isLocalStorageInstalled;
+}
+
+function checkAppInstalledState() {
+  if (isPwaInstalled()) {
+    const pwaBtn = document.getElementById('pwaInstallBtn');
+    const pwaBanner = document.getElementById('pwaBanner');
+    if (pwaBtn) pwaBtn.style.display = 'none';
+    if (pwaBanner) pwaBanner.style.display = 'none';
+  }
+}
+
+window.addEventListener('appinstalled', () => {
+  localStorage.setItem('pwa_app_installed', 'true');
+  showToast('🎉 MTCTiers App Installed Successfully!');
+  checkAppInstalledState();
+});
+
 window.addEventListener('beforeinstallprompt', (e) => {
   e.preventDefault();
   deferredPwaPrompt = e;
+  if (isPwaInstalled()) {
+    checkAppInstalledState();
+    return;
+  }
   const pwaBtn = document.getElementById('pwaInstallBtn');
   const pwaBanner = document.getElementById('pwaBanner');
   if (pwaBtn) pwaBtn.style.display = 'inline-flex';
@@ -2442,11 +2468,11 @@ function promptPwaInstall() {
     deferredPwaPrompt.prompt();
     deferredPwaPrompt.userChoice.then((choiceResult) => {
       if (choiceResult.outcome === 'accepted') {
+        localStorage.setItem('pwa_app_installed', 'true');
         showToast('🎉 MTCTiers App Installed!');
+        checkAppInstalledState();
       }
       deferredPwaPrompt = null;
-      const pwaBanner = document.getElementById('pwaBanner');
-      if (pwaBanner) pwaBanner.style.display = 'none';
     });
   } else {
     showToast('📱 To install on iOS Safari: Tap Share ➔ "Add to Home Screen"');
