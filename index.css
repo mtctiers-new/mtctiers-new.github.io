@@ -2146,4 +2146,283 @@ body {
   background: linear-gradient(135deg, #33f0ff 0%, #1ab0ff 100%);
 }
 
+/* 📲 PWA & 2FA AUTHENTICATOR STYLES */
+.btn-pwa-install {
+  padding: 8px 14px;
+  background: linear-gradient(135deg, rgba(0, 238, 255, 0.2) 0%, rgba(168, 85, 247, 0.2) 100%);
+  border: 1px solid var(--cyan);
+  border-radius: 12px;
+  color: var(--cyan);
+  font-family: var(--font-heading);
+  font-weight: 800;
+  font-size: 0.75rem;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  box-shadow: 0 0 15px rgba(0, 238, 255, 0.25);
+  transition: all 0.25s ease;
+  user-select: none;
+}
+.btn-pwa-install:hover {
+  transform: translateY(-2px);
+  background: var(--cyan);
+  color: #000;
+  box-shadow: 0 0 25px rgba(0, 238, 255, 0.6);
+}
+
+.offline-indicator {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  background: rgba(239, 68, 68, 0.95);
+  color: #fff;
+  font-family: var(--font-heading);
+  font-weight: 800;
+  font-size: 0.8rem;
+  letter-spacing: 0.5px;
+  text-align: center;
+  padding: 6px 12px;
+  z-index: 10001;
+  box-shadow: 0 4px 20px rgba(239, 68, 68, 0.4);
+  backdrop-filter: blur(10px);
+}
+
+.pwa-install-banner {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 9999;
+  max-width: 380px;
+  width: calc(100% - 40px);
+  animation: slideUpBanner 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+@keyframes slideUpBanner {
+  from { opacity: 0; transform: translateY(30px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.pwa-banner-content {
+  background: rgba(10, 20, 35, 0.95);
+  border: 1px solid var(--cyan);
+  border-radius: 16px;
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  box-shadow: 0 0 30px rgba(0, 238, 255, 0.35);
+  backdrop-filter: blur(16px);
+  position: relative;
+}
+
+.pwa-banner-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  object-fit: contain;
+}
+
+.pwa-banner-text {
+  flex: 1;
+}
+
+.pwa-banner-title {
+  font-family: var(--font-heading);
+  font-size: 0.9rem;
+  font-weight: 900;
+  color: #fff;
+}
+
+.pwa-banner-desc {
+  font-family: var(--font-body);
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  line-height: 1.2;
+  margin-top: 2px;
+}
+
+.btn-pwa-install-banner {
+  background: var(--cyan);
+  color: #000;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-family: var(--font-heading);
+  font-weight: 900;
+  font-size: 0.75rem;
+  cursor: pointer;
+  box-shadow: 0 0 12px rgba(0, 238, 255, 0.4);
+}
+
+.pwa-banner-close {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 1.2rem;
+  cursor: pointer;
+  padding: 0 4px;
+}
+.pwa-banner-close:hover { color: #fff; }
+
+/* Mobile Bottom Navigation Bar */
+.mobile-bottom-nav {
+  display: none;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 64px;
+  background: rgba(10, 20, 35, 0.96);
+  border-top: 1px solid var(--border-color);
+  backdrop-filter: blur(20px);
+  z-index: 999;
+  justify-content: space-around;
+  align-items: center;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+@media (max-width: 768px) {
+  .mobile-bottom-nav {
+    display: flex;
+  }
+  .main-container {
+    padding-bottom: 80px;
+  }
+  .pwa-install-banner {
+    bottom: 74px;
+  }
+}
+
+.mobile-nav-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  font-family: var(--font-heading);
+  font-size: 0.65rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex: 1;
+}
+
+.mobile-nav-icon {
+  font-size: 1.2rem;
+  margin-bottom: 2px;
+}
+
+.mobile-nav-item.active {
+  color: var(--cyan);
+  text-shadow: 0 0 10px rgba(0, 238, 255, 0.5);
+}
+
+/* 🔐 2FA AUTHENTICATOR VIEW STYLES */
+.totp-container {
+  max-width: 600px;
+  margin: 0 auto;
+  padding: 24px;
+  background: rgba(10, 20, 35, 0.9);
+  border: 1px solid var(--cyan);
+  border-radius: 24px;
+  box-shadow: 0 0 40px rgba(0, 238, 255, 0.25);
+  backdrop-filter: blur(16px);
+  font-family: var(--font-heading);
+  text-align: center;
+}
+
+.totp-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.totp-icon {
+  font-size: 2.2rem;
+}
+
+.totp-title {
+  font-size: 1.6rem;
+  font-weight: 900;
+  color: var(--cyan);
+  letter-spacing: 1px;
+}
+
+.totp-subtitle {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  margin-bottom: 24px;
+}
+
+.totp-card {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border-color);
+  border-radius: 18px;
+  padding: 24px;
+  margin-bottom: 20px;
+  position: relative;
+}
+
+.totp-code-display {
+  font-family: var(--font-mono);
+  font-size: 3rem;
+  font-weight: 900;
+  letter-spacing: 6px;
+  color: #fff;
+  text-shadow: 0 0 20px rgba(0, 238, 255, 0.8);
+  margin: 14px 0;
+  user-select: all;
+}
+
+.totp-timer-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+  color: var(--cyan);
+  font-weight: 700;
+}
+
+.totp-timer-svg {
+  width: 24px;
+  height: 24px;
+  transform: rotate(-90deg);
+}
+
+.totp-timer-circle {
+  fill: none;
+  stroke: var(--cyan);
+  stroke-width: 3;
+  stroke-dasharray: 63;
+  stroke-dashoffset: 0;
+  transition: stroke-dashoffset 1s linear;
+}
+
+.totp-secret-box {
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px dashed var(--cyan);
+  border-radius: 12px;
+  padding: 14px;
+  margin: 16px 0;
+  font-family: var(--font-mono);
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: var(--gold);
+  letter-spacing: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.totp-qr-img {
+  width: 160px;
+  height: 160px;
+  border-radius: 12px;
+  border: 2px solid var(--cyan);
+  margin: 12px auto;
+  display: block;
+}
+
+
 

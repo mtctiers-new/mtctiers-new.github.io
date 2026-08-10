@@ -472,8 +472,13 @@ function computeOverallPoints() {
 function switchTab(tab) {
   CURRENT_TAB = tab;
   document.querySelectorAll('.nav-link').forEach(n => n.classList.remove('active'));
+  document.querySelectorAll('.mobile-nav-item').forEach(m => m.classList.remove('active'));
+
   const navEl = document.getElementById('nav-' + tab);
   if (navEl) navEl.classList.add('active');
+
+  const mnavEl = document.getElementById('mnav-' + tab);
+  if (mnavEl) mnavEl.classList.add('active');
 
   const kitBar = document.getElementById('kitBar');
   const filterBar = document.getElementById('filterBar');
@@ -535,6 +540,9 @@ function renderCurrentTab() {
   } else if (CURRENT_TAB === 'duels') {
     if (podiumWrap) { podiumWrap.style.display = 'none'; podiumWrap.innerHTML = ''; }
     renderDuelsView();
+  } else if (CURRENT_TAB === '2fa') {
+    if (podiumWrap) { podiumWrap.style.display = 'none'; podiumWrap.innerHTML = ''; }
+    render2faView();
   }
 }
 
@@ -2200,4 +2208,250 @@ function getServerReqRulesHtml() {
   });
   html += `</div>`;
   return html;
+}
+
+/* 🔐 2FA AUTHENTICATOR & PWA MOBILE / PC SYSTEM */
+
+// Base32 Decoder
+function base32ToBytes(base32Str) {
+  const base32chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+  let bits = '';
+  let bytes = [];
+  const clean = (base32Str || '').toUpperCase().replace(/[^A-Z2-7]/g, '');
+
+  for (let i = 0; i < clean.length; i++) {
+    const val = base32chars.indexOf(clean.charAt(i));
+    bits += val.toString(2).padStart(5, '0');
+  }
+
+  for (let i = 0; i + 8 <= bits.length; i += 8) {
+    bytes.push(parseInt(bits.substr(i, 8), 2));
+  }
+
+  return new Uint8Array(bytes);
+}
+
+// Base32 Secret Generator
+function generateBase32Secret(length = 16) {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+  let secret = '';
+  const array = new Uint8Array(length);
+  crypto.getRandomValues(array);
+  for (let i = 0; i < length; i++) {
+    secret += chars[array[i] % chars.length];
+  }
+  return secret;
+}
+
+// Pure JavaScript RFC 6238 TOTP Generator (100% Offline via Web Crypto API)
+async function generateTOTPCode(secretBase32) {
+  try {
+    const secretBytes = base32ToBytes(secretBase32);
+    if (!secretBytes.length) return "000000";
+
+    const timeStep = 30;
+    const epoch = Math.floor(Date.now() / 1000);
+    const counter = Math.floor(epoch / timeStep);
+
+    const buffer = new ArrayBuffer(8);
+    const view = new DataView(buffer);
+    view.setUint32(4, counter, false);
+
+    const key = await crypto.subtle.importKey(
+      'raw',
+      secretBytes,
+      { name: 'HMAC', hash: 'SHA-1' },
+      false,
+      ['sign']
+    );
+
+    const signature = await crypto.subtle.sign('HMAC', key, buffer);
+    const sigBytes = new Uint8Array(signature);
+    const offset = sigBytes[sigBytes.length - 1] & 0xf;
+
+    const code = (
+      ((sigBytes[offset] & 0x7f) << 24) |
+      ((sigBytes[offset + 1] & 0xff) << 16) |
+      ((sigBytes[offset + 2] & 0xff) << 8) |
+      (sigBytes[offset + 3] & 0xff)
+    ) % 1000000;
+
+    return String(code).padStart(6, '0');
+  } catch (err) {
+    console.warn("TOTP generation note:", err.message);
+    return "000000";
+  }
+}
+
+let totpIntervalId = null;
+
+async function render2faView() {
+  const displayList = document.getElementById('displayList');
+  if (!displayList) return;
+
+  const currentAccount = CURRENT_USER ? (CURRENT_USER.email || CURRENT_USER.displayName || 'GuestUser') : 'MTCTiersPlayer';
+  let storedSecret = localStorage.getItem(`mtc_2fa_secret_${currentAccount}`);
+
+  if (!storedSecret) {
+    storedSecret = generateBase32Secret(16);
+    localStorage.setItem(`mtc_2fa_secret_${currentAccount}`, storedSecret);
+  }
+
+  const initialCode = await generateTOTPCode(storedSecret);
+  const formattedCode = initialCode.slice(0, 3) + ' ' + initialCode.slice(3);
+  const otpUrl = `otpauth://totp/MTCTiers:${encodeURIComponent(currentAccount)}?secret=${storedSecret}&issuer=MTCTiers`;
+  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(otpUrl)}`;
+
+  displayList.innerHTML = `
+    <div class="totp-container">
+      <div class="totp-header">
+        <span class="totp-icon">🔐</span>
+        <h2 class="totp-title">MTCTIERS 2FA AUTHENTICATOR</h2>
+      </div>
+      <p class="totp-subtitle">Official Mobile & Desktop PWA 2FA Security App — Works 100% Offline!</p>
+
+      <div class="totp-card">
+        <div style="font-size:0.8rem;color:var(--text-muted);letter-spacing:1px;">ACCOUNT: <strong style="color:#fff;">${currentAccount}</strong></div>
+        <div class="totp-code-display" id="totpLiveCode">${formattedCode}</div>
+        
+        <div class="totp-timer-wrap">
+          <svg class="totp-timer-svg" viewBox="0 0 24 24">
+            <circle class="totp-timer-circle" id="totpTimerCircle" cx="12" cy="12" r="10"></circle>
+          </svg>
+          <span>REFRESHES IN <strong id="totpSeconds">30</strong>s</span>
+        </div>
+      </div>
+
+      <div class="totp-secret-box">
+        <span>SECRET: <strong id="totpSecretText">${storedSecret}</strong></span>
+        <button class="auth-btn" style="padding:6px 12px;font-size:0.75rem;" onclick="copy2faSecret('${storedSecret}')">COPY SECRET</button>
+      </div>
+
+      <img src="${qrUrl}" alt="2FA QR Code" class="totp-qr-img" onerror="this.style.display='none'">
+      <div style="font-size:0.75rem;color:var(--text-muted);margin-top:4px;">Scan with Google Authenticator, Authy, or MTCTiers Mobile App</div>
+
+      <div style="margin-top:20px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">
+        <input type="text" id="totpTestInput" class="form-input" style="max-width:180px;text-align:center;font-size:1.1rem;font-weight:900;letter-spacing:2px;" placeholder="000000" maxlength="6">
+        <button class="auth-btn" onclick="verify2faCode('${storedSecret}')">VERIFY 2FA CODE</button>
+        <button class="btn-pwa-install" onclick="regenerate2faSecret('${currentAccount}')">REGENERATE KEY</button>
+      </div>
+    </div>
+  `;
+
+  startTotpLiveLoop(storedSecret);
+}
+
+function startTotpLiveLoop(secret) {
+  if (totpIntervalId) clearInterval(totpIntervalId);
+
+  const update = async () => {
+    const epoch = Math.floor(Date.now() / 1000);
+    const secondsLeft = 30 - (epoch % 30);
+    const secEl = document.getElementById('totpSeconds');
+    const circleEl = document.getElementById('totpTimerCircle');
+    const codeEl = document.getElementById('totpLiveCode');
+
+    if (secEl) secEl.innerText = secondsLeft;
+    if (circleEl) {
+      const offset = 63 * (1 - (secondsLeft / 30));
+      circleEl.style.strokeDashoffset = offset;
+    }
+
+    if (codeEl) {
+      const code = await generateTOTPCode(secret);
+      codeEl.innerText = code.slice(0, 3) + ' ' + code.slice(3);
+    }
+  };
+
+  update();
+  totpIntervalId = setInterval(update, 1000);
+}
+
+function copy2faSecret(secret) {
+  navigator.clipboard.writeText(secret).then(() => {
+    showToast('🔑 2FA Secret Key copied to clipboard!');
+  }).catch(() => {
+    showToast(`Secret: ${secret}`);
+  });
+}
+
+async function verify2faCode(secret) {
+  const inputEl = document.getElementById('totpTestInput');
+  const userVal = (inputEl ? inputEl.value : '').replace(/\s+/g, '').trim();
+  const validCode = await generateTOTPCode(secret);
+
+  if (userVal === validCode) {
+    showToast('✅ 2FA Code Verified Successfully! Account Secure.');
+  } else {
+    showToast('❌ Invalid 2FA Security Code. Try again.');
+  }
+}
+
+function regenerate2faSecret(account) {
+  if (confirm('Regenerate 2FA Secret Key? You will need to re-pair Google Authenticator / MTCTiers App.')) {
+    const newSecret = generateBase32Secret(16);
+    localStorage.setItem(`mtc_2fa_secret_${account}`, newSecret);
+    showToast('🔑 New 2FA Secret Key generated!');
+    render2faView();
+  }
+}
+
+/* 📲 PWA EVENT LISTENERS & SERVICE WORKER */
+let deferredPwaPrompt = null;
+
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredPwaPrompt = e;
+  const pwaBtn = document.getElementById('pwaInstallBtn');
+  const pwaBanner = document.getElementById('pwaBanner');
+  if (pwaBtn) pwaBtn.style.display = 'inline-flex';
+  if (pwaBanner && !localStorage.getItem('pwa_banner_closed')) {
+    pwaBanner.style.display = 'block';
+  }
+});
+
+function promptPwaInstall() {
+  if (deferredPwaPrompt) {
+    deferredPwaPrompt.prompt();
+    deferredPwaPrompt.userChoice.then((choiceResult) => {
+      if (choiceResult.outcome === 'accepted') {
+        showToast('🎉 MTCTiers App Installed!');
+      }
+      deferredPwaPrompt = null;
+      const pwaBanner = document.getElementById('pwaBanner');
+      if (pwaBanner) pwaBanner.style.display = 'none';
+    });
+  } else {
+    showToast('📱 To install on iOS Safari: Tap Share ➔ "Add to Home Screen"');
+  }
+}
+
+function closePwaBanner() {
+  const pwaBanner = document.getElementById('pwaBanner');
+  if (pwaBanner) pwaBanner.style.display = 'none';
+  localStorage.setItem('pwa_banner_closed', 'true');
+}
+
+// Service Worker Registration
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js')
+      .then(reg => console.log('⚡ [PWA] Service Worker registered:', reg.scope))
+      .catch(err => console.warn('[PWA] Service Worker registration note:', err.message));
+  });
+}
+
+// Offline Connection Event Listeners
+window.addEventListener('online', updateOnlineStatus);
+window.addEventListener('offline', updateOnlineStatus);
+
+function updateOnlineStatus() {
+  const offlineInd = document.getElementById('offlineIndicator');
+  if (!navigator.onLine) {
+    if (offlineInd) offlineInd.style.display = 'block';
+    showToast('📡 Connection Offline. Local Rankings & 2FA Active!');
+  } else {
+    if (offlineInd) offlineInd.style.display = 'none';
+    showToast('🟢 Online Connection Restored!');
+  }
 }

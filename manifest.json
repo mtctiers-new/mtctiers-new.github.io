@@ -1,0 +1,58 @@
+{
+  "name": "MTCTiers Mobile & PC App",
+  "short_name": "MTCTiers",
+  "description": "Official MTCTiers Application for MultiCraft PvP Rankings, Duels & 2FA Account Security",
+  "start_url": "/index.html?source=pwa",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0a1423",
+  "theme_color": "#00eeff",
+  "categories": ["games", "utilities", "entertainment"],
+  "icons": [
+    {
+      "src": "assets/mtctiers.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "assets/mtctiers.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Overal Rankings",
+      "short_name": "Rankings",
+      "description": "View overall MTCTiers player leaderboards",
+      "url": "/index.html?tab=home"
+    },
+    {
+      "name": "Kit Tiers",
+      "short_name": "Kits",
+      "description": "Browse PvP Kit tierlists",
+      "url": "/index.html?tab=rankings"
+    },
+    {
+      "name": "Duel History",
+      "short_name": "Duels",
+      "description": "View recent duel history and match results",
+      "url": "/index.html?tab=duels"
+    },
+    {
+      "name": "2FA Authenticator",
+      "short_name": "2FA Auth",
+      "description": "Generate offline 2FA security codes",
+      "url": "/index.html?tab=2fa"
+    },
+    {
+      "name": "Status Page",
+      "short_name": "Status",
+      "description": "Check real-time MTCTiers system status",
+      "url": "/status.html"
+    }
+  ]
+}

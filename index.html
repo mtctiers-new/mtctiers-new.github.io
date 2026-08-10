@@ -16,6 +16,13 @@
   <meta name="description" content="Official MultiCraft PvP Tierlist, Rankings & Player Profiles.">
 
   <link rel="icon" type="image/png" href="assets/mtctiers.png">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#00eeff">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="MTCTiers">
+  <link rel="apple-touch-icon" href="assets/mtctiers.png">
 
   <link rel="stylesheet" href="index.css">
 
@@ -24,6 +31,10 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 </head>
 <body>
+
+  <div id="offlineIndicator" class="offline-indicator" style="display:none;">
+    📡 <span>Offline Mode Active — 2FA Authenticator & Local Rankings Ready</span>
+  </div>
 
   <div id="enterScreen" class="enter-screen" onclick="enterSite()">
     <div class="enter-content">
@@ -50,10 +61,14 @@
       <div class="nav-link" id="nav-hof" onclick="switchTab('hof')">HALL OF FAME</div>
       <div class="nav-link" id="nav-testers" onclick="switchTab('testers')">TESTERS</div>
       <div class="nav-link" id="nav-duels" onclick="switchTab('duels')">DUELS</div>
+      <div class="nav-link" id="nav-2fa" onclick="switchTab('2fa')">2FA AUTH</div>
       <a href="status.html" class="nav-link" id="nav-status" style="text-decoration:none;">STATUS</a>
     </div>
 
     <div class="nav-right">
+      <button id="pwaInstallBtn" class="btn-pwa-install" onclick="promptPwaInstall()" style="display:none;" title="Install Native MTCTiers App">
+        <span>📲 INSTALL APP</span>
+      </button>
       <button id="adminDashBtn" class="btn-admin-dash" onclick="openAdminDashModal()" style="display:none;" title="Admin Whitelist Manager">
         <span>⚙️ WHITELIST</span>
       </button>
@@ -390,13 +405,241 @@
 
       <div class="duel-form-group">
         <label>Whitelisted Accounts & Roles</label>
+        </div>
+
+        <div class="modal-section-title">
+          <span>KIT EVALUATIONS & TIERS</span>
+        </div>
+
+        <div class="kit-circles-grid" id="pTiers"></div>
+
+      </div>
+    </div>
+  </div>
+
+  <div class="music-player-widget" id="musicPlayerWidget">
+    <div class="music-info">
+      <div class="music-eq-bars" id="musicEq">
+        <span></span><span></span><span></span><span></span>
+      </div>
+      <div class="music-text">
+        <div class="music-title">NOW PLAYING</div>
+        <div class="music-artist" id="musicTrackName">MTC Tiers Theme</div>
+      </div>
+    </div>
+    
+    <div class="music-controls">
+      <button class="music-btn" id="musicPlayBtn" onclick="toggleMusicPlay()">▶</button>
+      <input type="range" id="musicSeek" class="music-seek" value="0" min="0" max="100" oninput="seekMusic(this.value)">
+      <span class="music-time" id="musicTime">0:00</span>
+      <div class="music-volume-box">
+        <button class="music-vol-btn" id="musicVolBtn" onclick="toggleMuteMusic()" title="Mute/Unmute">🔊</button>
+        <input type="range" id="musicVolume" class="music-vol-slider" value="50" min="0" max="100" oninput="setMusicVolume(this.value)" title="Volume">
+      </div>
+    </div>
+  </div>
+
+  <!-- Duel Details Modal -->
+  <div id="duelPopupModal" class="modal-overlay" onclick="closeDuelPopup()">
+    <div class="profile-modal" style="max-width: 480px; padding: 28px;" onclick="event.stopPropagation()">
+      <div class="modal-actions">
+        <button class="icon-btn" onclick="closeDuelPopup()">✕</button>
+      </div>
+      <div id="duelPopupContent"></div>
+    </div>
+  </div>
+
+  <!-- Submit Duel Modal (Admin Whitelisted) -->
+  <div id="submitDuelModalOverlay" class="modal-overlay" onclick="closeSubmitDuelModalOnBackdrop(event)">
+    <div class="submit-duel-card" onclick="event.stopPropagation()">
+      <div class="modal-close-btn" onclick="closeSubmitDuelModal()">✕</div>
+      <h2 class="modal-title">⚔️ SUBMIT DUEL RESULT</h2>
+      <p class="modal-subtitle">Logged in as Whitelisted Staff Admin</p>
+      
+      <div class="duel-form-group">
+        <label>Player 1 (MultiCraft Username)</label>
+        <input type="text" id="sdP1" class="form-input" placeholder="e.g. Game1K" required>
+      </div>
+
+      <div class="duel-form-group">
+        <label>Player 2 (MultiCraft Username)</label>
+        <input type="text" id="sdP2" class="form-input" placeholder="e.g. revan" required>
+      </div>
+
+      <div class="duel-form-row">
+        <div class="duel-form-group">
+          <label>Kit Category</label>
+          <select id="sdKit" class="form-select">
+            <option value="Emerald">Emerald</option>
+            <option value="Emerald KB">Emerald KB</option>
+            <option value="Dragonhide KB">Dragonhide KB</option>
+            <option value="Manhunt">Manhunt</option>
+            <option value="Diamond">Diamond</option>
+            <option value="Novelty Axe">Novelty Axe</option>
+            <option value="Dragonhide Anchor">Dragonhide Anchor</option>
+            <option value="Void">Void</option>
+          </select>
+        </div>
+        <div class="duel-form-group">
+          <label>Winner</label>
+          <input type="text" id="sdWinner" class="form-input" placeholder="e.g. Game1K" required>
+        </div>
+      </div>
+
+      <div class="duel-form-row">
+        <div class="duel-form-group">
+          <label>P1 Score</label>
+          <input type="number" id="sdS1" class="form-input" value="3" min="0">
+        </div>
+        <div class="duel-form-group">
+          <label>P2 Score</label>
+          <input type="number" id="sdS2" class="form-input" value="1" min="0">
+        </div>
+      </div>
+
+      <div class="duel-form-group">
+        <label>Outcome / Title</label>
+        <input type="text" id="sdOutcome" class="form-input" placeholder="e.g. Promoted, Rank Match, Tier Test" value="Rank Match">
+      </div>
+
+      <div class="duel-form-group">
+        <label>Auto-Update Winner Tier (Optional)</label>
+        <select id="sdNewTier" class="form-select">
+          <option value="">Do Not Change Tier</option>
+          <option value="HT1">HT1 (50 pts)</option>
+          <option value="LT1">LT1 (40 pts)</option>
+          <option value="HT2">HT2 (30 pts)</option>
+          <option value="LT2">LT2 (20 pts)</option>
+          <option value="HT3">HT3 (12 pts)</option>
+          <option value="LT3">LT3 (8 pts)</option>
+          <option value="HT4">HT4 (5 pts)</option>
+          <option value="LT4">LT4 (3 pts)</option>
+          <option value="HT5">HT5 (2 pts)</option>
+          <option value="LT5">LT5 (1 pt)</option>
+        </select>
+      </div>
+
+      <button onclick="submitDuelFromSite()" class="auth-btn" style="margin-top:15px;width:100%;">SUBMIT & UPDATE TIER</button>
+    </div>
+  </div>
+
+  <!-- Edit Profile Modal (Self / Admin) -->
+  <div id="editProfileModalOverlay" class="modal-overlay" onclick="closeEditProfileModalOnBackdrop(event)">
+    <div class="submit-duel-card" onclick="event.stopPropagation()">
+      <div class="modal-close-btn" onclick="closeEditProfileModal()">✕</div>
+      <h2 class="modal-title">✏️ CUSTOMIZE PROFILE</h2>
+      <p class="modal-subtitle" id="epSub">Customize Profile BG, PFP, and Theme Color</p>
+
+      <div class="duel-form-group">
+        <label>Profile Picture / Skin Image URL</label>
+        <input type="text" id="epSkinUrl" class="form-input" placeholder="https://catbox.moe/example.png">
+      </div>
+
+      <div class="duel-form-group">
+        <label>Profile Background Banner Image URL</label>
+        <input type="text" id="epBannerUrl" class="form-input" placeholder="https://example.com/banner.jpg">
+      </div>
+
+      <div class="duel-form-row">
+        <div class="duel-form-group">
+          <label>Theme Accent Color</label>
+          <input type="color" id="epColor" class="form-input" value="#00eeff" style="height:42px;padding:4px;cursor:pointer;">
+        </div>
+        <div class="duel-form-group">
+          <label>LFM Status</label>
+          <select id="epLfm" class="form-select">
+            <option value="OFF">OFF</option>
+            <option value="ON">ON</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="duel-form-group">
+        <label>Rival</label>
+        <input type="text" id="epRival" class="form-input" placeholder="e.g. revan">
+      </div>
+
+      <div class="duel-form-group">
+        <label>Bio / Description</label>
+        <textarea id="epDesc" class="form-input" rows="3" placeholder="Enter custom bio..."></textarea>
+      </div>
+
+      <button onclick="saveProfileCustomization()" class="auth-btn" style="margin-top:10px;width:100%;">SAVE PROFILE CHANGES</button>
+    </div>
+  </div>
+
+  <!-- Admin Whitelist Dashboard Modal -->
+  <div id="adminDashModalOverlay" class="modal-overlay" onclick="closeAdminDashModalOnBackdrop(event)">
+    <div class="submit-duel-card" style="max-width:580px;" onclick="event.stopPropagation()">
+      <div class="modal-close-btn" onclick="closeAdminDashModal()">✕</div>
+      <h2 class="modal-title">⚙️ WHITELIST & PERMISSIONS MANAGER</h2>
+      <p class="modal-subtitle" id="adSub">Configure Admin rights and assigned player profile edit permissions</p>
+
+      <div class="duel-form-group">
+        <label>Account Email or Username</label>
+        <input type="text" id="adNewEmail" class="form-input" placeholder="e.g. player@gmail.com or username">
+      </div>
+
+      <div class="duel-form-row">
+        <div class="duel-form-group">
+          <label>Access Role</label>
+          <select id="adRole" class="form-select">
+            <option value="admin">Admin (Full Access)</option>
+            <option value="player">Player (Assigned Profile Only)</option>
+          </select>
+        </div>
+        <div class="duel-form-group">
+          <label>Modifiable Profile</label>
+          <select id="adAssignedPlayer" class="form-select">
+            <option value="*">All Profiles (*)</option>
+          </select>
+        </div>
+      </div>
+
+      <button onclick="addEmailToWhitelist()" class="auth-btn" style="margin-bottom:14px;width:100%;">+ ADD / UPDATE PERMISSIONS</button>
+
+      <div class="duel-form-group">
+        <label>Whitelisted Accounts & Roles</label>
         <div id="whitelistItemsList" style="max-height:220px;overflow-y:auto;background:rgba(13,15,23,0.9);border:1px solid var(--border-glass);border-radius:10px;padding:10px;display:flex;flex-direction:column;gap:8px;"></div>
       </div>
     </div>
   </div>
 
+  <!-- PWA Install Banner -->
+  <div id="pwaBanner" class="pwa-install-banner" style="display:none;">
+    <div class="pwa-banner-content">
+      <img src="assets/mtctiers.png" alt="MTCTiers App" class="pwa-banner-icon">
+      <div class="pwa-banner-text">
+        <div class="pwa-banner-title">Install MTCTiers App</div>
+        <div class="pwa-banner-desc">Offline 2FA security codes, instant rankings & fast PWA experience</div>
+      </div>
+      <button class="btn-pwa-install-banner" onclick="promptPwaInstall()">INSTALL</button>
+      <button class="pwa-banner-close" onclick="closePwaBanner()">&times;</button>
+    </div>
+  </div>
+
+  <!-- Mobile Bottom Navigation Bar (PWA & Small Screens) -->
+  <div class="mobile-bottom-nav">
+    <div class="mobile-nav-item active" id="mnav-home" onclick="switchTab('home')">
+      <span class="mobile-nav-icon">🏆</span>
+      <span class="mobile-nav-label">Rankings</span>
+    </div>
+    <div class="mobile-nav-item" id="mnav-rankings" onclick="switchTab('rankings')">
+      <span class="mobile-nav-icon">⚔️</span>
+      <span class="mobile-nav-label">Kits</span>
+    </div>
+    <div class="mobile-nav-item" id="mnav-duels" onclick="switchTab('duels')">
+      <span class="mobile-nav-icon">📜</span>
+      <span class="mobile-nav-label">Duels</span>
+    </div>
+    <div class="mobile-nav-item" id="mnav-2fa" onclick="switchTab('2fa')">
+      <span class="mobile-nav-icon">🔐</span>
+      <span class="mobile-nav-label">2FA Auth</span>
+    </div>
+  </div>
+
   <div id="toast" class="toast">Link copied to clipboard!</div>
 
-  <script src="app.js?v=20260808_01"></script>
+  <script src="app.js?v=20260810_pwa"></script>
 </body>
 </html>
