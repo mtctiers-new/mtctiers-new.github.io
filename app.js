@@ -29,12 +29,16 @@ try {
       const userName = document.getElementById('userName');
       const adminTag = document.getElementById('adminTag');
       const adminDuelBtn = document.getElementById('adminDuelBtn');
+      const nav2fa = document.getElementById('nav-2fa');
+      const mnav2fa = document.getElementById('mnav-2fa');
 
       if (user) {
         if (loginBtn) loginBtn.style.display = 'none';
         if (userProfile) userProfile.style.display = 'flex';
         if (userAvatar) userAvatar.src = user.photoURL || 'assets/mtctiers_default_skin.png';
         if (userName) userName.innerText = user.displayName || user.email.split('@')[0];
+        if (nav2fa) nav2fa.style.display = 'inline-block';
+        if (mnav2fa) mnav2fa.style.display = 'flex';
 
         await checkWhitelistStatus(user.email);
 
@@ -57,6 +61,9 @@ try {
         if (adminTag) adminTag.style.display = 'none';
         if (adminDuelBtn) adminDuelBtn.style.display = 'none';
         if (adminDashBtn) adminDashBtn.style.display = 'none';
+        if (nav2fa) nav2fa.style.display = 'none';
+        if (mnav2fa) mnav2fa.style.display = 'none';
+        if (CURRENT_TAB === '2fa') switchTab('home');
       }
     });
   }
@@ -201,12 +208,18 @@ async function logoutUser() {
   const adminTag = document.getElementById('adminTag');
   const adminDuelBtn = document.getElementById('adminDuelBtn');
   const adminDashBtn = document.getElementById('adminDashBtn');
+  const nav2fa = document.getElementById('nav-2fa');
+  const mnav2fa = document.getElementById('mnav-2fa');
 
   if (loginBtn) loginBtn.style.display = 'inline-flex';
   if (userProfile) userProfile.style.display = 'none';
   if (adminTag) adminTag.style.display = 'none';
   if (adminDuelBtn) adminDuelBtn.style.display = 'none';
   if (adminDashBtn) adminDashBtn.style.display = 'none';
+  if (nav2fa) nav2fa.style.display = 'none';
+  if (mnav2fa) mnav2fa.style.display = 'none';
+
+  if (CURRENT_TAB === '2fa') switchTab('home');
 
   showToast("Logged out");
 }
@@ -470,6 +483,12 @@ function computeOverallPoints() {
 }
 
 function switchTab(tab) {
+  if (tab === '2fa' && !CURRENT_USER) {
+    showToast("🔒 2FA Authenticator requires login. Please sign in with Google!");
+    switchTab('home');
+    return;
+  }
+
   CURRENT_TAB = tab;
   document.querySelectorAll('.nav-link').forEach(n => n.classList.remove('active'));
   document.querySelectorAll('.mobile-nav-item').forEach(m => m.classList.remove('active'));
