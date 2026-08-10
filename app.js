@@ -354,7 +354,39 @@ let CURRENT_TAB = 'home';
 let CURRENT_KIT = 'Overall';
 let CURRENT_PLAYER = null;
 
+function purgeDataCaches() {
+  const cacheKeys = [
+    'MTCTIERS_RANKINGS_CACHE_V2',
+    'MTCTIERS_DUELS_CACHE_V2',
+    'MTCTIERS_RANKINGS_CACHE',
+    'MTCTIERS_DUELS_CACHE',
+    'MTCTIERS_DATA_CACHE',
+    'MTCTIERS_CACHE_V1'
+  ];
+  cacheKeys.forEach(k => localStorage.removeItem(k));
+}
+
+async function destroyCache() {
+  purgeDataCaches();
+  try {
+    if ('caches' in window) {
+      const keys = await caches.keys();
+      await Promise.all(keys.map(k => caches.delete(k)));
+    }
+    if ('serviceWorker' in navigator) {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      for (let r of regs) await r.unregister();
+    }
+  } catch (e) { console.warn("Destroy cache note:", e.message); }
+
+  showToast("💥 All Caches & Service Worker Storage Destroyed!");
+  setTimeout(() => {
+    window.location.reload(true);
+  }, 500);
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
+  purgeDataCaches();
   initMusicPlayer();
   checkAppInstalledState();
   await loadRankingsData();

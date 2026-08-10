@@ -1,4 +1,4 @@
-const CACHE_NAME = 'mtctiers-pwa-v1';
+const CACHE_NAME = 'mtctiers-pwa-v2_fresh';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -23,13 +23,12 @@ const STATIC_ASSETS = [
 ];
 
 self.addEventListener('install', event => {
+  self.skipWaiting();
   event.waitUntil(
     caches.open(CACHE_NAME).then(cache => {
-      console.log('⚡ [Service Worker] Pre-caching static assets for offline use...');
-      return cache.addAll(STATIC_ASSETS).catch(err => {
-        console.warn('[Service Worker] Static pre-cache note:', err.message);
-      });
-    }).then(() => self.skipWaiting())
+      console.log('⚡ [Service Worker] Fresh cache initialized');
+      return cache.addAll(STATIC_ASSETS).catch(() => {});
+    })
   );
 });
 
@@ -37,7 +36,10 @@ self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys().then(keys => {
       return Promise.all(
-        keys.filter(key => key !== CACHE_NAME).map(key => caches.delete(key))
+        keys.map(key => {
+          console.log('💥 [Service Worker] Destroying old cache key:', key);
+          return caches.delete(key);
+        })
       );
     }).then(() => self.clients.claim())
   );
