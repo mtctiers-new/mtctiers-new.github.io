@@ -218,7 +218,91 @@ async function logoutUser() {
 
   if (CURRENT_TAB === '2fa') switchTab('home');
 
+  closeUserAccountMenu();
   showToast("Logged out");
+}
+
+/* 👤 USER ACCOUNT DROPDOWN MENU HANDLERS */
+function getLoggedInPlayerName() {
+  if (!CURRENT_USER) return null;
+  const email = (CURRENT_USER.email || '').toLowerCase().trim();
+  if (CURRENT_ASSIGNED_PLAYER && CURRENT_ASSIGNED_PLAYER !== '*') {
+    return CURRENT_ASSIGNED_PLAYER;
+  }
+  if (EMAIL_TO_PLAYER[email]) {
+    return EMAIL_TO_PLAYER[email];
+  }
+  if (CURRENT_USER.displayName) {
+    const matched = Object.keys(DATA.Overall || {}).find(p => p.toLowerCase().trim() === CURRENT_USER.displayName.toLowerCase().trim());
+    if (matched) return matched;
+  }
+  return CURRENT_USER.displayName || email.split('@')[0];
+}
+
+function toggleUserAccountMenu(e) {
+  if (e) e.stopPropagation();
+  const profileEl = document.getElementById('userProfile');
+  const menuEl = document.getElementById('userAccountMenu');
+  if (!menuEl) return;
+
+  const isActive = menuEl.classList.contains('active');
+  if (!isActive && CURRENT_USER) {
+    const nameEl = document.getElementById('menuUserName');
+    const emailEl = document.getElementById('menuUserEmail');
+    const pName = getLoggedInPlayerName();
+    if (nameEl) nameEl.innerText = pName || 'Player Account';
+    if (emailEl) emailEl.innerText = CURRENT_USER.email || '';
+    
+    menuEl.classList.add('active');
+    if (profileEl) profileEl.classList.add('menu-open');
+  } else {
+    menuEl.classList.remove('active');
+    if (profileEl) profileEl.classList.remove('menu-open');
+  }
+}
+
+function closeUserAccountMenu() {
+  const profileEl = document.getElementById('userProfile');
+  const menuEl = document.getElementById('userAccountMenu');
+  if (menuEl) menuEl.classList.remove('active');
+  if (profileEl) profileEl.classList.remove('menu-open');
+}
+
+document.addEventListener('click', (e) => {
+  const userProfile = document.getElementById('userProfile');
+  if (userProfile && !userProfile.contains(e.target)) {
+    closeUserAccountMenu();
+  }
+});
+
+function openMyPlayerProfile() {
+  closeUserAccountMenu();
+  const pName = getLoggedInPlayerName();
+  if (pName) {
+    openProfile(pName);
+  } else {
+    showToast("⚠️ Could not locate your player profile.");
+  }
+}
+
+function openMyProfileCustomization() {
+  closeUserAccountMenu();
+  const pName = getLoggedInPlayerName();
+  if (pName) {
+    CURRENT_PLAYER = pName;
+    openEditProfileModal();
+  } else {
+    showToast("⚠️ Could not locate your player profile.");
+  }
+}
+
+function openMy2faSecurity() {
+  closeUserAccountMenu();
+  if (isCurrentDeviceMobile()) {
+    switchTab('2fa');
+  } else {
+    showToast("📱 2FA Mobile Security is Mobile Only! Open MTCTiers on your phone.");
+  }
 }
 
 const AUTH_API = "https://mtc-backend-production-e0ab.up.railway.app/api";
