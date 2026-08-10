@@ -298,11 +298,7 @@ function openMyProfileCustomization() {
 
 function openMy2faSecurity() {
   closeUserAccountMenu();
-  if (isCurrentDeviceMobile()) {
-    switchTab('2fa');
-  } else {
-    showToast("📱 2FA Mobile Security is Mobile Only! Open MTCTiers on your phone.");
-  }
+  switchTab('2fa');
 }
 
 const AUTH_API = "https://mtc-backend-production-e0ab.up.railway.app/api";
