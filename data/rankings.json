@@ -82,44 +82,90 @@
   },
   "Players": [
     {
+      "description": "hi",
+      "discord": "x9jm",
+      "accentColor": "#ff0000",
+      "device": "MK",
+      "region": "NA",
+      "lfm": false,
       "name": "x9jm",
-      "region": "NA",
-      "device": "MK"
+      "bannerUrl": "https://yt3.googleusercontent.com/q-iegeURUaDkK8hpk9Qw4km7E5-9xsiCf37UAYFd2_U4zrWpCTqHrBEngbDXvFVNBCFWIeKZdg=w1707-fcrop64=1,00005a57ffffa5a8-k-c0xffffffff-no-nd-rj",
+      "skinUrl": "",
+      "youtube": "@x9jm",
+      "rival": "Game1K"
     },
     {
-      "name": "system1117",
+      "discord": "system1117_42144",
+      "device": "MK",
       "region": "NA",
-      "device": "MK"
+      "name": "system1117"
     },
     {
+      "description": "hello",
+      "accentColor": "#430094",
+      "device": "MK",
+      "region": "NA",
       "name": "Vorthexis",
-      "region": "NA",
-      "device": "MK"
+      "bannerUrl": "https://i.postimg.cc/vB305w6T/Screenshot-2026-08-08-at-5-53-48-PM.png",
+      "lfm": false,
+      "rival": "LastChance",
+      "skinUrl": "https://cdn.discordapp.com/ephemeral-attachments/1534308955642265713/1535774784405643284/download.png?ex=6a78fd39&is=6a77abb9&hm=9ea7d89756dcb12e23d136ec56fcfa95e5e525aef7587d099f3a7393f34085ac&"
     },
     {
+      "accentColor": "#00eeff",
+      "description": "",
+      "region": "NA",
+      "device": "MK",
+      "lfm": false,
       "name": "Possessed_YT",
-      "region": "NA",
-      "device": "MK"
+      "bannerUrl": "",
+      "skinUrl": "https://files.catbox.moe/0p09kl.png",
+      "rival": ""
     },
     {
-      "name": "TimmyLoal",
+      "accentColor": "#44ff00",
+      "discord": "twelvercy",
+      "description": "",
+      "device": "MK",
       "region": "OC",
-      "device": "MK"
+      "name": "TimmyLoal",
+      "bannerUrl": "",
+      "lfm": false,
+      "rival": "h",
+      "skinUrl": "https://files.catbox.moe/ldsuxy.png"
     },
     {
+      "device": "MK",
+      "region": "AS",
+      "accentColor": "#00eeff",
+      "description": "",
+      "rival": "",
+      "skinUrl": "https://files.catbox.moe/jc5cen.png",
       "name": "skibidi1234",
-      "region": "AS",
-      "device": "MK"
+      "bannerUrl": "",
+      "lfm": false
     },
     {
+      "description": "",
+      "accentColor": "#00eeff",
+      "device": "MK",
+      "region": "AS",
+      "lfm": false,
       "name": "DivyamGamerYT",
-      "region": "AS",
-      "device": "MK"
+      "bannerUrl": "",
+      "skinUrl": "https://files.catbox.moe/c2dzz4.png",
+      "rival": ""
     },
     {
-      "name": "revan",
+      "accentColor": "#00eeff",
+      "description": "",
+      "device": "TP",
       "region": "NA",
-      "device": "TP"
+      "lfm": false,
+      "name": "revan",
+      "bannerUrl": "",
+      "skinUrl": "https://files.catbox.moe/86seml.png",
+      "rival": ""
     },
     {
       "name": "ItzNoob_",
@@ -127,24 +173,24 @@
       "device": "MK"
     },
     {
-      "name": "FarXD",
+      "device": "MB",
       "region": "AS",
-      "device": "MB"
+      "name": "FarXD"
     },
     {
-      "name": "drago",
+      "device": "MK",
       "region": "AS",
-      "device": "MK"
+      "name": "drago"
     },
     {
-      "name": "Kirby",
       "region": "AS",
-      "device": "MK"
+      "device": "MK",
+      "name": "Kirby"
     },
     {
       "name": "NetworkHero",
-      "region": "EU",
-      "device": "MK"
+      "device": "MK",
+      "region": "EU"
     },
     {
       "name": "LifoMC",
@@ -153,8 +199,8 @@
     },
     {
       "name": "AntonioZga9",
-      "region": "NA",
-      "device": "MB"
+      "device": "MB",
+      "region": "NA"
     },
     {
       "name": "MGK",
@@ -167,27 +213,39 @@
       "device": "MB"
     },
     {
-      "name": "MatrixOP980",
       "region": "AS",
-      "device": "MB"
+      "device": "MB",
+      "name": "MatrixOP980"
     },
     {
-      "name": "SaintOfZytrox",
+      "device": "MB",
       "region": "AS",
-      "device": "MB"
+      "name": "SaintOfZytrox"
     },
     {
+      "description": "idk bro no one tt me.\ni am ht2 trust.",
+      "accentColor": "#284b4d",
+      "device": "MK",
+      "region": "AS",
+      "lfm": true,
       "name": "f0rg1v3n",
-      "region": "AS",
-      "device": "MK"
+      "bannerUrl": "https://cdn.discordapp.com/attachments/1415941181745139789/1532513426432200764/Terror_0001.jpg?ex=6a6d1fd9&is=6a6bce59&hm=c5f702b67f59da410ea930c6d976cdf004758d8a7eedf31e4552f362a0abfcc1&",
+      "skinUrl": "",
+      "rival": "ghost123"
     },
     {
-      "name": "Afdemonking",
+      "device": "MB",
       "region": "EU",
-      "device": "MB"
+      "name": "Afdemonking"
     },
     {
+      "bannerUrl": "",
       "name": "CosmicallyXVII",
+      "lfm": false,
+      "rival": "",
+      "skinUrl": "https://files.catbox.moe/80myjj.png",
+      "description": "",
+      "accentColor": "#00eeff",
       "region": "EU",
       "device": "MK"
     },
@@ -202,89 +260,132 @@
       "device": "MB"
     },
     {
+      "lfm": false,
       "name": "Jerryisking",
+      "bannerUrl": "",
+      "skinUrl": "https://files.catbox.moe/z4egq4.png",
+      "rival": "",
+      "accentColor": "#00eeff",
+      "description": "",
       "region": "AS",
       "device": "MK"
     },
     {
-      "name": "chi-na",
+      "device": "MK",
       "region": "EU",
-      "device": "MK"
+      "name": "chi-na"
     },
     {
+      "region": "EU",
+      "device": "MK",
+      "accentColor": "#00eeff",
+      "description": "",
+      "rival": "",
+      "skinUrl": "https://files.catbox.moe/wxb3zw.png",
+      "bannerUrl": "",
       "name": "CJSHORT",
-      "region": "EU",
-      "device": "MK"
+      "lfm": false
     },
     {
-      "name": "Husky_Multicraft",
+      "device": "MK",
       "region": "NA",
-      "device": "MK"
+      "name": "Husky_Multicraft"
     },
     {
-      "name": "RayValidd",
+      "device": "MK",
       "region": "AS",
-      "device": "MK"
+      "description": "",
+      "accentColor": "#00eeff",
+      "skinUrl": "https://files.catbox.moe/x3opjz.png",
+      "rival": "",
+      "lfm": false,
+      "bannerUrl": "",
+      "name": "RayValidd"
     },
     {
       "name": "-_ItsEthanLIT_-",
-      "region": "SA",
-      "device": "CT"
+      "device": "CT",
+      "region": "SA"
     },
     {
       "name": "Jetbunz99",
-      "region": "AS",
-      "device": "MB"
+      "device": "MB",
+      "region": "AS"
     },
     {
-      "name": "Oden_Sama",
       "region": "Unknown",
-      "device": "MB"
+      "device": "MB",
+      "name": "Oden_Sama"
     },
     {
       "name": "xenoXD",
-      "region": "AS",
-      "device": "MB"
+      "device": "MB",
+      "region": "AS"
     },
     {
-      "name": "MrDaRkYT",
       "region": "AS",
-      "device": "MK"
+      "device": "MK",
+      "name": "MrDaRkYT"
     },
     {
       "name": "Herobrine",
-      "region": "NA",
-      "device": "MK"
+      "device": "MK",
+      "region": "NA"
     },
     {
+      "lfm": false,
+      "bannerUrl": "https://cdn.discordapp.com/attachments/1534632209346990131/1534635301123788922/OIP.jpg?ex=6a74d7ff&is=6a73867f&hm=cca7ffb674a8bf801561046a9aeec5f81a3c522aaf3bb5affe2ef648e5449b1b&",
       "name": "LastChance",
-      "region": "NA",
-      "device": "MK"
+      "skinUrl": "https://cdn.discordapp.com/attachments/1534632209346990131/1534634484106924062/1000005982.png?ex=6a74d73d&is=6a7385bd&hm=19a9516a110b33c1887d2870abf4664ce5f34761a8ba27f80879783b586042e2&",
+      "rival": "",
+      "description": "fergtrg",
+      "discord": "jke3223",
+      "accentColor": "#00eeff",
+      "device": "MK",
+      "region": "NA"
     },
     {
-      "name": "Solace",
+      "device": "MK",
       "region": "AS",
-      "device": "MK"
+      "name": "Solace"
     },
     {
+      "skinUrl": "https://files.catbox.moe/els3gr.png",
+      "rival": "",
+      "lfm": false,
       "name": "-R3ZN-",
+      "bannerUrl": "",
       "region": "NA",
-      "device": "MB"
+      "device": "MB",
+      "accentColor": "#00eeff",
+      "description": ""
     },
     {
-      "name": "SJ_GHOST",
       "region": "NA",
-      "device": "MK"
+      "device": "MK",
+      "name": "SJ_GHOST"
     },
     {
+      "description": "",
+      "accentColor": "#00eeff",
+      "device": "MB",
+      "region": "NA",
       "name": "Luther",
-      "region": "NA",
-      "device": "MB"
+      "bannerUrl": "",
+      "lfm": false,
+      "rival": "",
+      "skinUrl": ""
     },
     {
-      "name": "vort3x",
+      "description": "dc: @vort3x.mtc\nyt: @vort3x-mtc",
+      "accentColor": "#ffffff",
       "region": "EU",
-      "device": "MK"
+      "device": "MK",
+      "bannerUrl": "https://tse3.mm.bing.net/th/id/OIP.m0rJAyZSahKIOXvhfZ8dNQHaFj?r=0&rs=1&pid=ImgDetMain&o=7&rm=3",
+      "name": "vort3x",
+      "lfm": false,
+      "rival": "maybe system1117?",
+      "skinUrl": "https://yt3.ggpht.com/Glbf468umZ_vhOp7eOeOZEM8TibMnBOWTxCbZMOTBmCzjGu6a3hE8Eqp-2XvrFUqXQkZFmk9RWU=s600-c-k-c0x00ffffff-no-rj-rp-mo"
     },
     {
       "name": "Dream_MultiCraft",
@@ -303,48 +404,67 @@
     },
     {
       "name": "Ayush_maan234",
-      "region": "AS",
-      "device": "MK"
+      "device": "MK",
+      "region": "AS"
     },
     {
-      "name": "Corpse",
       "region": "NA",
-      "device": "CT"
+      "device": "CT",
+      "name": "Corpse"
     },
     {
+      "device": "MB",
+      "region": "NA",
+      "description": "my enemies are many, my equals are none.",
+      "accentColor": "#ff0000",
+      "rival": "Blade",
+      "skinUrl": "",
       "name": "Kaeye",
-      "region": "NA",
-      "device": "MB"
+      "bannerUrl": "",
+      "lfm": false
     },
     {
+      "accentColor": "#0000ff",
+      "discord": "game1kyt",
+      "description": "west coast best coast",
+      "device": "MK",
+      "region": "NA",
+      "lfm": false,
       "name": "Game1K",
-      "region": "NA",
-      "device": "MK"
+      "bannerUrl": "https://files.catbox.moe/kxd5t2.png",
+      "skinUrl": "https://files.catbox.moe/w1alxi.png",
+      "rival": "system1117\u2019s alts"
     },
     {
-      "name": "SHADE",
       "region": "AS",
-      "device": "MK"
+      "device": "MK",
+      "name": "SHADE"
     },
     {
       "name": "Terminator",
-      "region": "AS",
-      "device": "MK"
+      "device": "MK",
+      "region": "AS"
     },
     {
-      "name": "Duality",
       "region": "AS",
-      "device": "MB"
+      "device": "MB",
+      "name": "Duality"
     },
     {
-      "name": "Superboy",
       "region": "AF",
-      "device": "MB"
+      "device": "MB",
+      "name": "Superboy"
     },
     {
-      "name": "jogg",
+      "description": "",
+      "accentColor": "#00eeff",
       "region": "NA",
-      "device": "CT"
+      "device": "CT",
+      "name": "jogg",
+      "bannerUrl": "",
+      "lfm": false,
+      "rival": "",
+      "skinUrl": "https://files.catbox.moe/2bvlqc.png"
     },
     {
       "name": "Atomix",
@@ -352,74 +472,100 @@
       "device": "MB"
     },
     {
-      "name": "Ron_",
       "region": "Unknown",
-      "device": "MK"
+      "device": "MK",
+      "name": "Ron_"
     },
     {
-      "name": "Normal",
+      "device": "MK",
       "region": "EU",
-      "device": "MK"
+      "name": "Normal"
     },
     {
-      "name": "TERRORRR",
+      "description": "",
+      "accentColor": "#00eeff",
       "region": "AS",
-      "device": "MK"
+      "device": "MK",
+      "lfm": false,
+      "name": "TERRORRR",
+      "bannerUrl": "",
+      "skinUrl": "https://files.catbox.moe/b4zto4.png",
+      "rival": ""
     },
     {
       "name": "MTCTIERS",
-      "region": "MTCTIERS",
-      "device": "MTCTIERS"
+      "device": "MTCTIERS",
+      "region": "MTCTIERS"
     },
     {
       "name": "Redistdrext",
-      "region": "AS",
-      "device": "MK"
+      "device": "MK",
+      "region": "AS"
     },
     {
-      "name": "MENDOR",
+      "device": "MK",
       "region": "AF",
-      "device": "MK"
+      "name": "MENDOR"
     },
     {
+      "accentColor": "#002aff",
+      "description": "",
+      "device": "MK",
+      "region": "AF",
+      "bannerUrl": "https://static.vecteezy.com/system/resources/previews/056/433/620/non_2x/abstract-blue-wave-geometry-banner-background-with-3d-look-and-simple-pattern-cool-and-luxury-design-eps10-vector.jpg",
       "name": "ziadlive",
-      "region": "AF",
-      "device": "MK"
+      "lfm": false,
+      "rival": "x9jm",
+      "skinUrl": ""
     },
     {
       "name": "Fortress",
-      "region": "Unknown",
-      "device": "Unknown"
+      "device": "Unknown",
+      "region": "Unknown"
     },
     {
-      "name": "ghost123",
+      "device": "MB",
       "region": "AS",
-      "device": "MB"
+      "name": "ghost123"
     },
     {
+      "rival": "sex",
+      "skinUrl": "",
+      "bannerUrl": "",
       "name": "sample",
+      "lfm": false,
       "region": "AS",
-      "device": "TP"
+      "device": "TP",
+      "description": "",
+      "accentColor": "#00eeff"
     },
     {
-      "name": "-_Hades_-",
+      "accentColor": "#00eeff",
+      "description": "",
       "region": "NA",
-      "device": "MK"
+      "device": "MK",
+      "name": "-_Hades_-",
+      "bannerUrl": "",
+      "lfm": false,
+      "rival": "",
+      "skinUrl": "https://files.catbox.moe/fkv3q7.png"
     },
     {
-      "name": "Ashar",
+      "device": "MK",
       "region": "AS",
-      "device": "MK"
+      "name": "Ashar"
     },
     {
       "name": "spareman2",
-      "region": "AS",
-      "device": "MB"
+      "device": "MB",
+      "region": "AS"
     },
     {
-      "name": "_Mario34_",
+      "skinUrl": "https://media.discordapp.net/ephemeral-attachments/1534308955642265715/1534585065001062500/mar-removebg-preview.png?ex=6a74a936&is=6a7357b6&hm=e6d4435acebd4e03342d5c75e6590e89199aa3d9ba9fb97c9894df2425e0679c&=&format=webp&quality=lossless",
       "region": "NA",
-      "device": "MK"
+      "device": "MK",
+      "name": "_Mario34_",
+      "discord": "nowaynoname"
     },
     {
       "name": "ChillPotato",
@@ -427,39 +573,75 @@
       "device": "MK"
     },
     {
-      "name": "Charm_Of_Luck",
       "region": "NA",
-      "device": "MK"
+      "device": "MK",
+      "name": "Charm_Of_Luck"
     },
     {
-      "name": "Space2k",
       "region": "NA",
-      "device": "MK"
+      "device": "MK",
+      "name": "Space2k"
     },
     {
       "name": "MrLivingstone",
-      "region": "AS",
-      "device": "MB"
+      "device": "MB",
+      "region": "AS"
     },
     {
-      "name": "Verlin",
+      "description": "hy",
+      "accentColor": "#00eeff",
       "region": "NA",
-      "device": "MB"
+      "device": "MB",
+      "bannerUrl": "",
+      "name": "Verlin",
+      "lfm": false,
+      "rival": "",
+      "skinUrl": ""
     },
     {
       "name": "<<< . ., > .,/",
-      "region": "Unknown",
-      "device": ",.,/ , <<"
+      "device": ",.,/ , <<",
+      "region": "Unknown"
     },
     {
       "name": "PVP_PC_KAMIL69",
-      "region": "EU",
-      "device": "MK"
+      "device": "MK",
+      "region": "EU"
     },
     {
-      "name": "-_Joker_-",
       "region": "NA",
-      "device": "MB"
+      "device": "MB",
+      "name": "-_Joker_-"
+    },
+    {
+      "description": "",
+      "accentColor": "#000000",
+      "device": "MB",
+      "region": "EU",
+      "lfm": false,
+      "bannerUrl": "",
+      "name": "lukeLUKE",
+      "skinUrl": "",
+      "rival": "None"
+    },
+    {
+      "device": "MB",
+      "region": "EU",
+      "accentColor": "#00eeff",
+      "description": "",
+      "skinUrl": "",
+      "rival": "None",
+      "lfm": false,
+      "name": "Straight_",
+      "bannerUrl": ""
+    },
+    {
+      "region": "NA",
+      "device": "MK",
+      "rival": "None",
+      "description": "",
+      "lfm": false,
+      "name": "Skattered"
     }
   ],
   "Diamond": {

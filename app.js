@@ -14,6 +14,10 @@ let CURRENT_USER = null;
 let IS_ADMIN = false;
 let WHITELIST_EMAILS = ['admin@mtctiers.com', 'mtctiers@gmail.com', 'cicweb@gmail.com', 'game1k@mtctiers.com'];
 
+const FIRESTORE_BASE = 'https://firestore.googleapis.com/v1/projects/mtctiers/databases/(default)/documents';
+let firestoreReadDenied = false;
+let firestoreStatusToastShown = false;
+
 try {
   if (typeof firebase !== 'undefined') {
     firebase.initializeApp(firebaseConfig);
@@ -29,12 +33,14 @@ try {
       const userName = document.getElementById('userName');
       const adminTag = document.getElementById('adminTag');
       const adminDuelBtn = document.getElementById('adminDuelBtn');
+      const mnav2fa = document.getElementById('mnav-2fa');
 
       if (user) {
         if (loginBtn) loginBtn.style.display = 'none';
         if (userProfile) userProfile.style.display = 'flex';
         if (userAvatar) userAvatar.src = user.photoURL || 'assets/mtctiers_default_skin.png';
         if (userName) userName.innerText = user.displayName || user.email.split('@')[0];
+        if (mnav2fa) mnav2fa.style.display = 'flex';
 
         await checkWhitelistStatus(user.email);
 
@@ -57,6 +63,8 @@ try {
         if (adminTag) adminTag.style.display = 'none';
         if (adminDuelBtn) adminDuelBtn.style.display = 'none';
         if (adminDashBtn) adminDashBtn.style.display = 'none';
+        if (mnav2fa) mnav2fa.style.display = 'none';
+        if (CURRENT_TAB === '2fa') switchTab('home');
       }
     });
   }
@@ -83,6 +91,80 @@ async function sha256Hex(str) {
   return Array.from(new Uint8Array(hashBuf)).map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
+async function getFirebaseIdToken() {
+  if (!auth || !auth.currentUser) return '';
+  try {
+    return await auth.currentUser.getIdToken();
+  } catch (e) {
+    return '';
+  }
+}
+
+function describeFirestoreHttpError(status, context) {
+  if (status === 429) {
+    return `Firebase rate limited (HTTP 429) while ${context}.`;
+  }
+  if (status === 403 || status === 401) {
+    return `Firebase denied ${context} (HTTP ${status}). Unauthenticated client reads of rankings/players_meta/whitelist/duels are blocked. GitHub Pages cannot use the Admin SDK — the Discord bot publishes data/*.json, and AUTH_API serves live duels. Firestore rules were not opened from this site.`;
+  }
+  return `Firebase error (HTTP ${status}) while ${context}.`;
+}
+
+function notifyFirestoreReadStatus(status, context) {
+  if (status === 403 || status === 401) {
+    firestoreReadDenied = true;
+  }
+  console.warn(describeFirestoreHttpError(status, context));
+  if (firestoreStatusToastShown) return;
+  if (status === 429) {
+    firestoreStatusToastShown = true;
+    showToast('⚠️ Serving published snapshot (Firebase rate limited)');
+  } else if (status === 403 || status === 401) {
+    firestoreStatusToastShown = true;
+    showToast('⚠️ Live Firebase is not publicly readable. Showing published snapshot.');
+  }
+}
+
+async function firestoreRest(path, options = {}) {
+  const headers = Object.assign({ 'Content-Type': 'application/json' }, options.headers || {});
+  const token = await getFirebaseIdToken();
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  const url = path.startsWith('http') ? path : `${FIRESTORE_BASE}/${String(path).replace(/^\//, '')}`;
+  const fetchOpts = Object.assign({}, options, { headers });
+  delete fetchOpts.headers;
+  fetchOpts.headers = headers;
+  return fetch(url, fetchOpts);
+}
+
+async function firestoreWriteDoc(collection, docId, fieldsObj) {
+  if (!auth || !auth.currentUser) {
+    throw new Error('Sign in with Google is required to write to Firebase. GitHub Pages cannot use the Admin SDK.');
+  }
+  if (db) {
+    try {
+      await db.collection(collection).doc(docId).set(fieldsObj, { merge: true });
+      return;
+    } catch (err) {
+      console.warn('Firestore SDK write failed, trying authenticated REST:', err.message);
+    }
+  }
+
+  const payload = { fields: {} };
+  for (const [k, v] of Object.entries(fieldsObj)) {
+    if (v !== undefined) payload.fields[k] = pyToFirestoreValue(v);
+  }
+  const mask = Object.keys(fieldsObj)
+    .filter(k => fieldsObj[k] !== undefined)
+    .map(k => `updateMask.fieldPaths=${encodeURIComponent(k)}`)
+    .join('&');
+  const path = `${collection}/${encodeURIComponent(docId)}${mask ? '?' + mask : ''}`;
+  const res = await firestoreRest(path, { method: 'PATCH', body: JSON.stringify(payload) });
+  if (!res.ok) {
+    const errJson = await res.json().catch(() => ({}));
+    throw new Error(errJson.error?.message || describeFirestoreHttpError(res.status, `writing ${collection}/${docId}`));
+  }
+}
+
 const EMAIL_TO_PLAYER = {
   'ziadn6b@gmail.com': 'ziadlive',
   'v4n1shedytoffical@gmail.com': 'vorthexis',
@@ -101,7 +183,7 @@ async function checkWhitelistStatus(email) {
   const emailHash = await sha256Hex(cleanEmail);
 
   try {
-    const fsRes = await fetch("https://firestore.googleapis.com/v1/projects/mtctiers/databases/(default)/documents/rankings/whitelist");
+    const fsRes = await firestoreRest('rankings/whitelist');
     if (fsRes.ok) {
       const doc = await fsRes.json();
       const rawEntriesStr = doc.fields?.entries?.stringValue;
@@ -113,6 +195,12 @@ async function checkWhitelistStatus(email) {
           }
         } catch (e) {}
       }
+    } else if (fsRes.status === 403 || fsRes.status === 401) {
+      console.warn(describeFirestoreHttpError(fsRes.status, 'reading rankings/whitelist'));
+    } else if (fsRes.status === 429) {
+      notifyFirestoreReadStatus(429, 'reading rankings/whitelist');
+    } else {
+      console.warn(describeFirestoreHttpError(fsRes.status, 'reading rankings/whitelist'));
     }
   } catch (e) {
     console.warn("Whitelist fetch note:", e.message);
@@ -201,14 +289,100 @@ async function logoutUser() {
   const adminTag = document.getElementById('adminTag');
   const adminDuelBtn = document.getElementById('adminDuelBtn');
   const adminDashBtn = document.getElementById('adminDashBtn');
+  const nav2fa = document.getElementById('nav-2fa');
+  const mnav2fa = document.getElementById('mnav-2fa');
 
   if (loginBtn) loginBtn.style.display = 'inline-flex';
   if (userProfile) userProfile.style.display = 'none';
   if (adminTag) adminTag.style.display = 'none';
   if (adminDuelBtn) adminDuelBtn.style.display = 'none';
   if (adminDashBtn) adminDashBtn.style.display = 'none';
+  if (nav2fa) nav2fa.style.display = 'none';
+  if (mnav2fa) mnav2fa.style.display = 'none';
 
+  if (CURRENT_TAB === '2fa') switchTab('home');
+
+  closeUserAccountMenu();
   showToast("Logged out");
+}
+
+/* 👤 USER ACCOUNT DROPDOWN MENU HANDLERS */
+function getLoggedInPlayerName() {
+  if (!CURRENT_USER) return null;
+  const email = (CURRENT_USER.email || '').toLowerCase().trim();
+  if (CURRENT_ASSIGNED_PLAYER && CURRENT_ASSIGNED_PLAYER !== '*') {
+    return CURRENT_ASSIGNED_PLAYER;
+  }
+  if (EMAIL_TO_PLAYER[email]) {
+    return EMAIL_TO_PLAYER[email];
+  }
+  if (CURRENT_USER.displayName) {
+    const matched = Object.keys(DATA.Overall || {}).find(p => p.toLowerCase().trim() === CURRENT_USER.displayName.toLowerCase().trim());
+    if (matched) return matched;
+  }
+  return CURRENT_USER.displayName || email.split('@')[0];
+}
+
+function toggleUserAccountMenu(e) {
+  if (e) e.stopPropagation();
+  const profileEl = document.getElementById('userProfile');
+  const menuEl = document.getElementById('userAccountMenu');
+  if (!menuEl) return;
+
+  const isActive = menuEl.classList.contains('active');
+  if (!isActive && CURRENT_USER) {
+    const nameEl = document.getElementById('menuUserName');
+    const emailEl = document.getElementById('menuUserEmail');
+    const pName = getLoggedInPlayerName();
+    if (nameEl) nameEl.innerText = pName || 'Player Account';
+    if (emailEl) emailEl.innerText = CURRENT_USER.email || '';
+    
+    menuEl.classList.add('active');
+    if (profileEl) profileEl.classList.add('menu-open');
+  } else {
+    menuEl.classList.remove('active');
+    if (profileEl) profileEl.classList.remove('menu-open');
+  }
+}
+
+function closeUserAccountMenu() {
+  const profileEl = document.getElementById('userProfile');
+  const menuEl = document.getElementById('userAccountMenu');
+  if (menuEl) menuEl.classList.remove('active');
+  if (profileEl) profileEl.classList.remove('menu-open');
+}
+
+document.addEventListener('click', (e) => {
+  const userProfile = document.getElementById('userProfile');
+  if (userProfile && !userProfile.contains(e.target)) {
+    closeUserAccountMenu();
+  }
+});
+
+function openMyPlayerProfile() {
+  closeUserAccountMenu();
+  const pName = getLoggedInPlayerName();
+  if (pName) {
+    openProfile(pName);
+  } else {
+    showToast("⚠️ Could not locate your player profile.");
+  }
+}
+
+function openMyProfileCustomization() {
+  closeUserAccountMenu();
+  const pName = getLoggedInPlayerName();
+  if (pName) {
+    CURRENT_PLAYER = pName;
+    openEditProfileModal();
+  } else {
+    showToast("⚠️ Could not locate your player profile.");
+  }
+}
+
+function openMy2faSecurity() {
+  closeUserAccountMenu();
+  switchTab('2fa');
 }
 
 const AUTH_API = "https://mtc-backend-production-e0ab.up.railway.app/api";
@@ -260,10 +434,42 @@ let CURRENT_TAB = 'dashboard';
 let CURRENT_KIT = 'Overall';
 let CURRENT_PLAYER = null;
 
+function purgeDataCaches() {
+  const cacheKeys = [
+    'MTCTIERS_RANKINGS_CACHE_V2',
+    'MTCTIERS_DUELS_CACHE_V2',
+    'MTCTIERS_RANKINGS_CACHE',
+    'MTCTIERS_DUELS_CACHE',
+    'MTCTIERS_DATA_CACHE',
+    'MTCTIERS_CACHE_V1'
+  ];
+  cacheKeys.forEach(k => localStorage.removeItem(k));
+}
+
+async function destroyCache() {
+  purgeDataCaches();
+  try {
+    if ('caches' in window) {
+      const keys = await caches.keys();
+      await Promise.all(keys.map(k => caches.delete(k)));
+    }
+    if ('serviceWorker' in navigator) {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      for (let r of regs) await r.unregister();
+    }
+  } catch (e) { console.warn("Destroy cache note:", e.message); }
+
+  showToast("💥 All Caches & Service Worker Storage Destroyed!");
+  setTimeout(() => {
+    window.location.reload(true);
+  }, 500);
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
   initMusicPlayer();
+  checkAppInstalledState();
   await loadRankingsData();
-  handleUrlParamsOnLoad();
+  await handleUrlParamsOnLoad();
 });
 
 function parseFirestoreValue(fieldVal) {
@@ -368,45 +574,78 @@ function normalizeDataKits(dataObj) {
 async function loadRankingsData() {
   try {
     let loadedFromFirestore = false;
+    const now = Date.now();
+    const cachedObjStr = localStorage.getItem('MTCTIERS_RANKINGS_CACHE_V2');
+    let cachedObj = null;
 
-    // 1. Fetch directly from Firebase Firestore REST API (Primary Source of Truth)
-    try {
-      const fsRes = await fetch("https://firestore.googleapis.com/v1/projects/mtctiers/databases/(default)/documents/rankings");
-      if (fsRes.ok) {
-        const fsData = await fsRes.json();
-        const docs = fsData.documents || [];
-        if (docs.length) {
-          docs.forEach(doc => {
-            const docId = doc.name.split('/').pop();
-            if (docId === 'players_meta') {
-              const rawPlayers = doc.fields?.players?.arrayValue?.values || [];
-              DATA.Players = rawPlayers.map(item => parseFirestoreMap(item.mapValue?.fields || {}));
-            } else if (docId === 'whitelist') {
-              const rawEntriesStr = doc.fields?.entries?.stringValue;
-              if (rawEntriesStr) {
-                try { WHITELIST_ENTRIES = JSON.parse(rawEntriesStr); } catch (e) {}
-              }
-            } else if (['Overall', 'config', 'admin_guide', 'queue_state', 'all_data', 'main'].includes(docId)) {
-              // Exclude non-kit metadata documents
-            } else {
-              let parsedDoc = parseFirestoreMap(doc.fields || {});
-              if (parsedDoc && parsedDoc.tiers && typeof parsedDoc.tiers === 'object') {
-                parsedDoc = parsedDoc.tiers;
-              }
-              DATA[docId] = parsedDoc;
-            }
-          });
-          loadedFromFirestore = true;
-        }
-      }
-    } catch (e) {
-      console.warn("Direct Firestore REST load note:", e.message);
+    if (cachedObjStr) {
+      try { cachedObj = JSON.parse(cachedObjStr); } catch (e) {}
     }
 
-    // 2. Fallback to local rankings.json only if offline/Firestore unreachable
+    // 1. If cache is fresh (< 60s), load instantly
+    if (cachedObj && cachedObj.ts && (now - cachedObj.ts < 60000) && cachedObj.data) {
+      DATA = cachedObj.data;
+      normalizeDataKits(DATA);
+      computeOverallPoints();
+      window.DATA = DATA;
+      renderCurrentTab();
+      return;
+    }
+
+    // 2. Fetch from Firestore with the signed-in token when present.
+    // Unauthenticated REST is 403 for rankings/players_meta/whitelist — do not treat that as success.
+    if (!firestoreReadDenied) {
+      try {
+        const fsRes = await firestoreRest('rankings?pageSize=100');
+        if (fsRes.status === 429) {
+          notifyFirestoreReadStatus(429, 'reading rankings');
+        } else if (fsRes.status === 403 || fsRes.status === 401) {
+          notifyFirestoreReadStatus(fsRes.status, 'reading rankings');
+        } else if (fsRes.ok) {
+          const fsData = await fsRes.json();
+          const docs = fsData.documents || [];
+          if (docs.length) {
+            docs.forEach(doc => {
+              const docId = doc.name.split('/').pop();
+              if (docId === 'players_meta') {
+                const rawPlayers = doc.fields?.players?.arrayValue?.values || [];
+                DATA.Players = rawPlayers.map(item => parseFirestoreMap(item.mapValue?.fields || {}));
+              } else if (docId === 'whitelist') {
+                const rawEntriesStr = doc.fields?.entries?.stringValue;
+                if (rawEntriesStr) {
+                  try { WHITELIST_ENTRIES = JSON.parse(rawEntriesStr); } catch (e) {}
+                }
+              } else if (['Overall', 'config', 'admin_guide', 'queue_state', 'all_data', 'main'].includes(docId)) {
+                // Exclude non-kit metadata documents
+              } else {
+                let parsedDoc = parseFirestoreMap(doc.fields || {});
+                if (parsedDoc && parsedDoc.tiers && typeof parsedDoc.tiers === 'object') {
+                  parsedDoc = parsedDoc.tiers;
+                }
+                DATA[docId] = parsedDoc;
+              }
+            });
+            loadedFromFirestore = true;
+            try {
+              localStorage.setItem('MTCTIERS_RANKINGS_CACHE_V2', JSON.stringify({ ts: now, data: DATA }));
+            } catch (e) {}
+          }
+        } else {
+          notifyFirestoreReadStatus(fsRes.status, 'reading rankings');
+        }
+      } catch (e) {
+        console.warn("Direct Firestore REST load note:", e.message);
+      }
+    }
+
+    // 3. Published snapshot (bot/Admin SDK → data/rankings.json). Used when Firestore is 403/429/offline.
     if (!loadedFromFirestore) {
-      const res = await fetch(`data/rankings.json?v=${Date.now()}`);
-      DATA = await res.json();
+      if (cachedObj && cachedObj.data) {
+        DATA = cachedObj.data;
+      } else {
+        const res = await fetch(`data/rankings.json?v=${now}`);
+        if (res.ok) DATA = await res.json();
+      }
     }
 
     normalizeDataKits(DATA);
@@ -442,11 +681,28 @@ function computeOverallPoints() {
   }
 }
 
-function switchTab(tab) {
+function isMobileDevice() {
+  return window.innerWidth <= 768 || /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+}
+
+function switchTab(tab, options) {
+  if (tab === '2fa') {
+    if (!CURRENT_USER) {
+      showToast("🔒 2FA Authenticator requires login. Please sign in with Google!");
+      switchTab('home');
+      return;
+    }
+  }
+
   CURRENT_TAB = tab;
   document.querySelectorAll('.nav-link').forEach(n => n.classList.remove('active'));
+  document.querySelectorAll('.mobile-nav-item').forEach(m => m.classList.remove('active'));
+
   const navEl = document.getElementById('nav-' + tab);
   if (navEl) navEl.classList.add('active');
+
+  const mnavEl = document.getElementById('mnav-' + tab);
+  if (mnavEl) mnavEl.classList.add('active');
 
   const kitBar = document.getElementById('kitBar');
   const filterBar = document.getElementById('filterBar');
@@ -481,7 +737,9 @@ function switchTab(tab) {
     if (dashboardWrap) { dashboardWrap.style.display = 'none'; dashboardWrap.innerHTML = ''; }
   }
 
-  renderCurrentTab();
+  if (!(options && options.skipRender)) {
+    renderCurrentTab();
+  }
 }
 
 function updateKitBarActive(kitName) {
@@ -519,6 +777,9 @@ function renderCurrentTab() {
   } else if (CURRENT_TAB === 'duels') {
     if (podiumWrap) { podiumWrap.style.display = 'none'; podiumWrap.innerHTML = ''; }
     renderDuelsView();
+  } else if (CURRENT_TAB === '2fa') {
+    if (podiumWrap) { podiumWrap.style.display = 'none'; podiumWrap.innerHTML = ''; }
+    render2faView();
   }
 }
 
@@ -862,38 +1123,6 @@ function duelDescLine(d, playerName) {
   return `${kit}${tier ? ' · ' + tier : ''}`.trim();
 }
 
-function openDuelPopupById(id, perspective) {
-  const d = DUELS_REGISTRY.get(String(id));
-  if (!d) return;
-  openDuelPopup(d, perspective);
-}
-
-function openDuelPopup(d, perspective) {
-  const p = perspective || d.player1;
-  const info = duelPerspective(d, p);
-  const date = new Date(d.timestamp || d.created_at * 1000 || Date.now()).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-  const desc = duelDescLine(d, p);
-  const cardColor = info.won ? 'var(--emerald)' : 'var(--crimson)';
-
-  document.getElementById('duelPopupContent').innerHTML = `
-    <div style="text-align:center;">
-      <div style="font-family:var(--font-mono);font-size:0.75rem;color:var(--text-muted);letter-spacing:2px;margin-bottom:12px;">${d.kit || ''} ${d.tier && d.tier !== 'Unknown' ? '· ' + d.tier : ''}</div>
-      <div style="font-family:var(--font-mono);font-size:0.8rem;color:${cardColor};border:1px solid ${cardColor};border-radius:20px;padding:4px 16px;display:inline-block;margin-bottom:16px;letter-spacing:1px;font-weight:700;">${desc}</div>
-      <div style="display:flex;align-items:center;justify-content:center;gap:16px;margin-bottom:16px;">
-        <span style="font-family:var(--font-heading);font-weight:800;font-size:1.2rem;color:#fff;cursor:pointer;" onclick="closeDuelPopup();openProfile('${d.player1}')">${d.player1}</span>
-        <span style="font-family:var(--font-mono);font-size:0.8rem;color:var(--cyan);">VS</span>
-        <span style="font-family:var(--font-heading);font-weight:800;font-size:1.2rem;color:#fff;cursor:pointer;" onclick="closeDuelPopup();openProfile('${d.player2}')">${d.player2}</span>
-      </div>
-      <div style="font-family:var(--font-heading);font-weight:900;font-size:3rem;color:${cardColor};letter-spacing:4px;line-height:1;margin-bottom:12px;">${d.player1_score} - ${d.player2_score}</div>
-      <div style="font-family:var(--font-mono);font-size:0.75rem;color:var(--text-dim);">${date}</div>
-    </div>`;
-  document.getElementById('duelPopupModal').classList.add('active');
-}
-
-function closeDuelPopup() {
-  document.getElementById('duelPopupModal').classList.remove('active');
-}
-
 function parseFirestoreMap(fields) {
   if (!fields || typeof fields !== 'object') return {};
   const d = {};
@@ -903,7 +1132,10 @@ function parseFirestoreMap(fields) {
 
     if (valObj.stringValue !== undefined) d[k] = valObj.stringValue;
     else if (valObj.integerValue !== undefined) d[k] = parseInt(valObj.integerValue, 10);
+    else if (valObj.doubleValue !== undefined) d[k] = valObj.doubleValue;
     else if (valObj.booleanValue !== undefined) d[k] = valObj.booleanValue;
+    else if (valObj.timestampValue !== undefined) d[k] = valObj.timestampValue;
+    else if (valObj.nullValue !== undefined) d[k] = null;
     else if (valObj.arrayValue !== undefined) {
       d[k] = (valObj.arrayValue.values || []).map(item => parseFirestoreMapVal(item));
     }
@@ -917,62 +1149,162 @@ function parseFirestoreMapVal(item) {
   if (!item || typeof item !== 'object') return item;
   if (item.stringValue !== undefined) return item.stringValue;
   if (item.integerValue !== undefined) return parseInt(item.integerValue, 10);
+  if (item.doubleValue !== undefined) return item.doubleValue;
   if (item.booleanValue !== undefined) return item.booleanValue;
+  if (item.timestampValue !== undefined) return item.timestampValue;
+  if (item.nullValue !== undefined) return null;
   if (item.mapValue) return parseFirestoreMap(item.mapValue.fields || {});
   if (item.arrayValue) return (item.arrayValue.values || []).map(parseFirestoreMapVal);
   return Object.values(item)[0];
 }
 
+function toPositiveInt(val) {
+  if (typeof val === 'number') {
+    return Number.isInteger(val) && val > 0 && Number.isSafeInteger(val) ? val : null;
+  }
+  if (typeof val === 'string') {
+    const s = val.trim();
+    if (!/^[1-9]\d{0,8}$/.test(s)) return null;
+    return parseInt(s, 10);
+  }
+  return null;
+}
+
+function getDuelIntegerId(d) {
+  if (!d || typeof d !== 'object') return null;
+  const fromNumber = toPositiveInt(d.duel_number);
+  if (fromNumber) return fromNumber;
+  if (d.message_id && d.duel_number == null) return null;
+  return toPositiveInt(d.id);
+}
+
+let MAX_DUEL_INTEGER_ID = 364;
+
+function noteDuelIntegerId(n) {
+  if (n && n > MAX_DUEL_INTEGER_ID) MAX_DUEL_INTEGER_ID = n;
+}
+
+async function allocateNextDuelIntegerId() {
+  if (db) {
+    try {
+      const meta = await db.collection('duels').doc('all_duels').get();
+      const fromMeta = meta.exists ? toPositiveInt(meta.data().total_count) : null;
+      if (fromMeta) noteDuelIntegerId(fromMeta);
+    } catch (e) {
+      console.warn('all_duels total_count read note:', e.message);
+    }
+  }
+  for (const v of DUELS_REGISTRY.values()) {
+    noteDuelIntegerId(getDuelIntegerId(v));
+  }
+  try {
+    const cached = JSON.parse(localStorage.getItem('MTCTIERS_DUELS_CACHE_V2') || 'null');
+    if (cached && Array.isArray(cached.duels)) {
+      cached.duels.forEach(d => noteDuelIntegerId(getDuelIntegerId(d)));
+    }
+  } catch (e) {}
+  return MAX_DUEL_INTEGER_ID + 1;
+}
+
 function dedupeAndSortDuels(duels) {
   const map = new Map();
   duels.forEach(d => {
-    const key = d.id || d.message_id || `${d.player1}_${d.player2}_${d.timestamp || d.created_at}`;
-    if (!map.has(key)) map.set(key, d);
+    const id = getDuelIntegerId(d);
+    if (!id) return;
+    noteDuelIntegerId(id);
+    const existing = map.get(id);
+    if (!existing) {
+      map.set(id, d);
+      return;
+    }
+    if (toPositiveInt(existing.duel_number) == null && toPositiveInt(d.duel_number) != null) {
+      map.set(id, d);
+    }
   });
-  const list = Array.from(map.values());
-  return list.sort((a, b) => new Date(b.timestamp || b.created_at * 1000 || 0) - new Date(a.timestamp || a.created_at * 1000 || 0));
+  return Array.from(map.values()).sort((a, b) => getDuelIntegerId(b) - getDuelIntegerId(a));
+}
+
+function collectDuelsFromPayload(payload, into) {
+  if (!payload) return;
+  if (Array.isArray(payload)) {
+    into.push(...payload);
+  } else if (Array.isArray(payload.duels)) {
+    into.push(...payload.duels);
+  } else if (typeof payload === 'object') {
+    Object.values(payload).forEach(val => {
+      if (Array.isArray(val)) into.push(...val);
+      else if (val && Array.isArray(val.duels)) into.push(...val.duels);
+    });
+  }
 }
 
 async function fetchDuelsFromFirestore(playerFilter) {
   let allDuels = [];
+  const now = Date.now();
+  const cachedDuelsStr = localStorage.getItem('MTCTIERS_DUELS_CACHE_V2');
+  let cachedDuelsObj = null;
 
-  // Load from local data/duels.json first (complete backup)
-  try {
-    const res = await fetch(`data/duels.json?v=${Date.now()}`);
-    if (res.ok) {
-      const localData = await res.json();
-      if (Array.isArray(localData)) allDuels.push(...localData);
-      else if (localData && Array.isArray(localData.duels)) allDuels.push(...localData.duels);
-      else if (typeof localData === 'object') {
-        Object.values(localData).forEach(val => {
-          if (Array.isArray(val)) allDuels.push(...val);
-          else if (val && Array.isArray(val.duels)) allDuels.push(...val.duels);
+  if (cachedDuelsStr) {
+    try { cachedDuelsObj = JSON.parse(cachedDuelsStr); } catch (e) {}
+  }
+
+  // 1. Firestore (authenticated when possible). Unauthenticated list is 403 — do not treat as success.
+  if (!firestoreReadDenied) {
+    try {
+      const res = await firestoreRest('duels?pageSize=300');
+      if (res.status === 429) {
+        notifyFirestoreReadStatus(429, 'reading duels');
+      } else if (res.status === 403 || res.status === 401) {
+        notifyFirestoreReadStatus(res.status, 'reading duels');
+      } else if (res.ok) {
+        const data = await res.json();
+        const docs = data.documents || [];
+        docs.forEach(doc => {
+          const rawDuels = doc.fields?.duels?.arrayValue?.values || [];
+          rawDuels.forEach(item => {
+            allDuels.push(parseFirestoreMap(item.mapValue?.fields || {}));
+          });
         });
+      } else {
+        notifyFirestoreReadStatus(res.status, 'reading duels');
       }
+    } catch (e) { console.warn("Firestore REST duels note:", e.message); }
+  }
+
+  // 2. Existing Railway AUTH_API — live duels when Firestore is not publicly readable.
+  try {
+    const url = playerFilter
+      ? `${AUTH_API}/duels?player=${encodeURIComponent(playerFilter)}&limit=200`
+      : `${AUTH_API}/duels?limit=200`;
+    const res = await fetch(url);
+    if (res.ok) {
+      const data = await res.json();
+      collectDuelsFromPayload(data, allDuels);
+    } else {
+      console.warn('AUTH_API duels HTTP', res.status);
+    }
+  } catch (e) { console.warn("AUTH_API duels note:", e.message); }
+
+  // 3. Published snapshot (bot → data/duels.json)
+  try {
+    const res = await fetch(`data/duels.json?v=${now}`);
+    if (res.ok) {
+      collectDuelsFromPayload(await res.json(), allDuels);
     }
   } catch (e) { console.warn("Local duels.json fetch note:", e.message); }
 
-  // Merge with Firestore live duels
-  try {
-    const baseREST = "https://firestore.googleapis.com/v1/projects/mtctiers/databases/(default)/documents/duels";
-    const res = await fetch(`${baseREST}?pageSize=300`);
-    if (res.ok) {
-      const data = await res.json();
-      const docs = data.documents || [];
-      docs.forEach(doc => {
-        const rawDuels = doc.fields?.duels?.arrayValue?.values || [];
-        rawDuels.forEach(item => {
-          allDuels.push(parseFirestoreMap(item.mapValue?.fields || {}));
-        });
-      });
-    }
-  } catch (e) { console.warn("Firestore REST duels note:", e.message); }
+  if (cachedDuelsObj && Array.isArray(cachedDuelsObj.duels)) {
+    allDuels.push(...cachedDuelsObj.duels);
+  }
 
   const combined = dedupeAndSortDuels(allDuels);
+  try {
+    localStorage.setItem('MTCTIERS_DUELS_CACHE_V2', JSON.stringify({ ts: now, duels: combined }));
+  } catch (e) {}
 
   if (playerFilter) {
     const cleanP = playerFilter.toLowerCase().trim();
-    return combined.filter(d => 
+    return combined.filter(d =>
       (d.player1 && d.player1.toLowerCase().trim() === cleanP) ||
       (d.player2 && d.player2.toLowerCase().trim() === cleanP)
     );
@@ -991,14 +1323,17 @@ async function renderDuelsView(playerFilter) {
     let duels = await fetchDuelsFromFirestore(playerFilter);
 
     if (!duels || !duels.length) {
-      const base = AUTH_API.replace('/api', '');
       const url = playerFilter
-        ? `${base}/api/duels?player=${encodeURIComponent(playerFilter)}&limit=50`
-        : `${base}/api/duels?limit=100`;
+        ? `${AUTH_API}/duels?player=${encodeURIComponent(playerFilter)}&limit=50`
+        : `${AUTH_API}/duels?limit=200`;
       const res = await fetch(url);
-      const data = await res.json();
-      duels = data.duels || [];
+      if (res.ok) {
+        const data = await res.json();
+        duels = data.duels || [];
+      }
     }
+
+    duels = (duels || []).filter(d => getDuelIntegerId(d));
 
     if (!duels.length) {
       displayList.innerHTML = `<div style="text-align:center;padding:40px;color:var(--text-muted);font-family:var(--font-heading);">No duels found</div>`;
@@ -1014,9 +1349,11 @@ async function renderDuelsView(playerFilter) {
     `;
 
     DUELS_REGISTRY.clear();
-    duels.forEach((d, i) => {
-      const duelId = String(d.id || d.message_id || `d_${i}`);
-      DUELS_REGISTRY.set(duelId, d);
+    duels.forEach((d) => {
+      const duelNum = getDuelIntegerId(d);
+      if (!duelNum) return;
+      DUELS_REGISTRY.set(duelNum, d);
+      DUELS_REGISTRY.set(String(duelNum), d);
 
       const perspective = playerFilter || d.player1;
       const info = duelPerspective(d, perspective);
@@ -1024,9 +1361,10 @@ async function renderDuelsView(playerFilter) {
       const desc = duelDescLine(d, perspective);
 
       html += `
-        <div class="duel-row ${info.won ? 'won' : 'lost'}" onclick="openDuelPopupById('${duelId}', '${perspective}')">
+        <div class="duel-row ${info.won ? 'won' : 'lost'}" onclick="openDuelPopupById('${duelNum}', '${perspective}')">
           <div class="duel-row-top">
             <div class="duel-names">
+              <span class="duel-num-tag">#${duelNum}</span>
               <span class="duel-p1" onclick="event.stopPropagation();openProfile('${perspective}')">${perspective}</span>
               <span class="duel-vs">vs</span>
               <span class="duel-p2" onclick="event.stopPropagation();openProfile('${info.opponent}')">${info.opponent}</span>
@@ -1056,8 +1394,7 @@ async function renderProfileDuels(playerName) {
     let duels = await fetchDuelsFromFirestore(playerName);
 
     if (!duels || !duels.length) {
-      const base = AUTH_API.replace('/api', '');
-      const res = await fetch(`${base}/api/duels?player=${encodeURIComponent(playerName)}&limit=50`);
+      const res = await fetch(`${AUTH_API}/duels?player=${encodeURIComponent(playerName)}&limit=50`);
       if (res.ok) {
         const data = await res.json();
         duels = data.duels || [];
@@ -1082,8 +1419,11 @@ async function renderProfileDuels(playerName) {
     if (!bioCard || !duels || !duels.length) return;
 
     const d = duels[0];
-    const duelId = String(d.id || d.message_id || `latest_${playerName}`);
-    DUELS_REGISTRY.set(duelId, d);
+    const duelId = getDuelIntegerId(d);
+    if (duelId) {
+      DUELS_REGISTRY.set(duelId, d);
+      DUELS_REGISTRY.set(String(duelId), d);
+    }
 
     const info = duelPerspective(d, playerName);
     const date = new Date(d.timestamp || d.created_at * 1000 || Date.now()).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
@@ -1096,7 +1436,7 @@ async function renderProfileDuels(playerName) {
         <span class="profile-duel-label-text">LATEST DUEL</span>
         <span class="profile-duel-viewall" onclick="closeProfileModal();switchTab('duels');renderDuelsView('${playerName}')">VIEW ALL ▶</span>
       </div>
-      <div class="profile-duel-card" onclick="openDuelPopupById('${duelId}', '${playerName}')">
+      <div class="profile-duel-card" onclick="${duelId ? `openDuelPopupById('${duelId}', '${playerName}')` : ''}">
         <div class="profile-duel-top">
           <div class="profile-duel-names">${playerName} <span>vs</span> ${info.opponent}</div>
           <div class="profile-duel-score-text" style="color: ${info.won ? 'var(--emerald)' : 'var(--crimson)'};">${info.myScore}-${info.oppScore}</div>
@@ -1128,7 +1468,26 @@ function selectKit(kit) {
   renderCurrentTab();
 }
 
+function resolvePlayerName(raw) {
+  if (!raw) return null;
+  let clean = String(raw);
+  try { clean = decodeURIComponent(clean); } catch (e) {}
+  clean = clean.replace(/\+/g, ' ').trim();
+  if (!clean) return null;
+  const keys = Object.keys(DATA.Overall || {});
+  const exact = keys.find(p => p === clean);
+  if (exact) return exact;
+  const lower = clean.toLowerCase();
+  const ci = keys.find(p => p.toLowerCase() === lower);
+  return ci || clean;
+}
+
+function siteShareBase() {
+  return `${window.location.origin}/`;
+}
+
 async function openProfile(name) {
+  name = resolvePlayerName(name) || name;
   CURRENT_PLAYER = name;
   const overlay = document.getElementById('profileModalOverlay');
   const modal = document.getElementById('profileModal');
@@ -1140,8 +1499,9 @@ async function openProfile(name) {
   document.getElementById('pName').innerText = name;
 
   const sortedOverall = Object.entries(DATA.Overall).sort((a, b) => b[1] - a[1]);
-  const rankIndex = sortedOverall.findIndex(([p]) => p === name);
-  const targetPts = DATA.Overall[name] || 0;
+  const rankIndex = sortedOverall.findIndex(([p]) => p.toLowerCase() === name.toLowerCase());
+  const overallKey = rankIndex !== -1 ? sortedOverall[rankIndex][0] : name;
+  const targetPts = DATA.Overall[overallKey] || DATA.Overall[name] || 0;
   const rankNum = rankIndex !== -1 ? rankIndex + 1 : 999;
   const tInfo = getPlayerTitle(targetPts, rankNum);
 
@@ -1186,7 +1546,9 @@ async function openProfile(name) {
   }
   const nameEl = document.getElementById('pName');
   if (nameEl) {
-    nameEl.innerText = name;
+    const customEmote = (pDetail.customEmote || pDetail.emote || '').trim();
+    const emoteHtml = customEmote ? `<span class="profile-custom-emote" title="Custom Profile Emote">${escapeHTML(customEmote)}</span>` : '';
+    nameEl.innerHTML = `${escapeHTML(name)}${emoteHtml}`;
     nameEl.style.color = accent;
   }
 
@@ -1227,7 +1589,9 @@ async function openProfile(name) {
   renderProfileDuels(name);
 
   if (window.history && window.history.replaceState) {
-    window.history.replaceState(null, '', `?player=${encodeURIComponent(name)}`);
+    const params = new URLSearchParams(window.location.search);
+    params.set('player', name);
+    window.history.replaceState(null, '', `${window.location.pathname}?${params.toString()}`);
   }
 
   overlay.classList.add('active');
@@ -1236,21 +1600,30 @@ async function openProfile(name) {
 function closeProfileModal() {
   document.getElementById('profileModalOverlay').classList.remove('active');
   if (window.history && window.history.replaceState) {
-    window.history.replaceState(null, '', window.location.pathname);
+    const params = new URLSearchParams(window.location.search);
+    params.delete('player');
+    params.delete('p');
+    const qs = params.toString();
+    window.history.replaceState(null, '', qs ? `${window.location.pathname}?${qs}` : window.location.pathname);
   }
 }
 
 const DUELS_REGISTRY = new Map();
 
 function copyDuelLink(duelId, playerName) {
-  const baseUrl = window.location.origin + window.location.pathname;
-  let shareUrl = `${baseUrl}?tab=duels&duel=${encodeURIComponent(duelId)}`;
+  const n = toPositiveInt(duelId);
+  if (!n) {
+    showToast('⚠️ This duel has no integer id to share.');
+    return;
+  }
+  const baseUrl = siteShareBase();
+  let shareUrl = `${baseUrl}?tab=duels&duel=${n}`;
   if (playerName) {
     shareUrl += `&player=${encodeURIComponent(playerName)}`;
   }
   if (navigator.clipboard && navigator.clipboard.writeText) {
     navigator.clipboard.writeText(shareUrl).then(() => {
-      showToast(`🔗 Copied direct link for Duel #${duelId}!`);
+      showToast(`🔗 Copied direct link for Duel #${n}!`);
     }).catch(() => {
       prompt("Copy direct duel link:", shareUrl);
     });
@@ -1260,10 +1633,15 @@ function copyDuelLink(duelId, playerName) {
 }
 
 function openDuelPopupById(duelId, perspective) {
-  let duel = DUELS_REGISTRY.get(String(duelId));
+  const n = toPositiveInt(duelId);
+  if (!n) {
+    showToast(`⚠️ Duel #${duelId} is not a valid integer id.`);
+    return;
+  }
+  let duel = DUELS_REGISTRY.get(n) || DUELS_REGISTRY.get(String(n));
   if (!duel) {
-    for (const [k, v] of DUELS_REGISTRY.entries()) {
-      if (String(v.id || v.timestamp || v.message_id) === String(duelId)) {
+    for (const v of DUELS_REGISTRY.values()) {
+      if (getDuelIntegerId(v) === n) {
         duel = v;
         break;
       }
@@ -1272,7 +1650,7 @@ function openDuelPopupById(duelId, perspective) {
   if (duel) {
     openDuelPopup(duel, perspective);
   } else {
-    showToast(`⚠️ Duel #${duelId} not found in current cache.`);
+    showToast(`⚠️ Duel #${n} not found in current cache.`);
   }
 }
 
@@ -1280,7 +1658,7 @@ function openDuelPopup(duel, perspective) {
   const p = perspective || duel.player1;
   const info = duelPerspective(duel, p);
   const dateStr = new Date(duel.timestamp || duel.created_at * 1000 || Date.now()).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' });
-  const duelId = String(duel.id || duel.timestamp || duel.message_id || 'N/A');
+  const duelNum = getDuelIntegerId(duel);
 
   let modal = document.getElementById('duelPopupModalOverlay');
   if (!modal) {
@@ -1295,8 +1673,8 @@ function openDuelPopup(duel, perspective) {
     <div class="modal-card duel-popup-card" style="max-width:480px;border-color:var(--cyan);box-shadow:0 0 35px rgba(0,238,255,0.35);background:rgba(10,20,35,0.95);backdrop-filter:blur(16px);border-radius:20px;padding:24px;position:relative;">
       <button class="modal-close-btn" style="position:absolute;top:16px;right:16px;background:none;border:none;color:#aaa;font-size:1.5rem;cursor:pointer;" onclick="closeDuelPopup()">&times;</button>
       <div style="font-family:var(--font-heading);font-weight:900;font-size:1.3rem;color:var(--cyan);margin-bottom:4px;display:flex;align-items:center;justify-content:space-between;">
-        <span>⚔️ DUEL DETAILS</span>
-        <span style="font-size:0.8rem;color:var(--text-muted);font-weight:600;">ID: #${duelId}</span>
+        <span>⚔️ DUEL #${duelNum ?? 'N/A'}</span>
+        <span style="font-size:0.8rem;color:var(--text-muted);font-weight:600;">ID: #${duelNum ?? 'N/A'}</span>
       </div>
       <div style="font-family:var(--font-heading);font-size:0.85rem;color:var(--text-muted);margin-bottom:16px;">${dateStr}</div>
 
@@ -1332,22 +1710,28 @@ function openDuelPopup(duel, perspective) {
       ` : ''}
 
       <div style="display:flex;gap:10px;">
-        <button class="btn btn-secondary" style="flex:1;padding:10px 16px;" onclick="copyDuelLink('${duelId}', '${p}')">🔗 Copy Direct Link</button>
+        <button class="btn btn-secondary" style="flex:1;padding:10px 16px;" onclick="copyDuelLink('${duelNum}', '${p}')">🔗 Copy Direct Link</button>
         <button class="btn btn-primary" style="flex:1;padding:10px 16px;" onclick="closeDuelPopup()">Close</button>
       </div>
     </div>
   `;
 
   if (window.history && window.history.replaceState) {
-    window.history.replaceState(null, '', `?tab=duels&player=${encodeURIComponent(p)}&duel=${encodeURIComponent(duelId)}`);
+    const params = new URLSearchParams();
+    params.set('tab', 'duels');
+    if (duelNum) params.set('duel', String(duelNum));
+    if (p) params.set('player', p);
+    window.history.replaceState(null, '', `?${params.toString()}`);
   }
 
   modal.classList.add('active');
 }
 
 function closeDuelPopup() {
-  const modal = document.getElementById('duelPopupModalOverlay');
-  if (modal) modal.classList.remove('active');
+  const overlay = document.getElementById('duelPopupModalOverlay');
+  if (overlay) overlay.classList.remove('active');
+  const htmlModal = document.getElementById('duelPopupModal');
+  if (htmlModal) htmlModal.classList.remove('active');
 }
 
 function closeModalOnBackdrop(e) {
@@ -1367,46 +1751,52 @@ async function handleUrlParamsOnLoad() {
     const params = new URLSearchParams(search);
     if (params.has('player')) targetPlayer = params.get('player');
     else if (params.has('p')) targetPlayer = params.get('p');
-    if (params.has('duel')) targetDuelId = params.get('duel');
-    else if (params.has('d')) targetDuelId = params.get('d');
+    if (params.has('duel')) targetDuelId = toPositiveInt(params.get('duel'));
+    else if (params.has('d')) targetDuelId = toPositiveInt(params.get('d'));
     if (params.has('tab')) targetTab = params.get('tab');
   }
 
-  if (!targetPlayer && hash) {
+  if (hash) {
     const rawHash = hash.substring(1).trim();
-    if (rawHash.startsWith('player=')) targetPlayer = rawHash.replace('player=', '');
-    else if (!rawHash.includes('=')) targetPlayer = rawHash;
+    if (!targetPlayer && rawHash.startsWith('player=')) targetPlayer = rawHash.replace('player=', '');
+    else if (!targetDuelId && rawHash.startsWith('duel=')) targetDuelId = toPositiveInt(rawHash.replace('duel=', ''));
+    else if (!targetPlayer && rawHash && !rawHash.includes('=')) targetPlayer = rawHash;
   }
 
-  if (targetTab === 'duels') {
-    switchTab('duels');
-    await renderDuelsView(targetPlayer);
-  } else if (targetPlayer) {
-    const cleanName = decodeURIComponent(targetPlayer).replace(/\+/g, ' ').trim();
-    if (cleanName) {
-      setTimeout(() => {
-        openProfile(cleanName);
-      }, 200);
-    }
+  if (targetPlayer) {
+    targetPlayer = resolvePlayerName(targetPlayer);
   }
 
   if (targetDuelId) {
-    setTimeout(async () => {
-      const duels = await fetchDuelsFromFirestore(targetPlayer);
-      duels.forEach(d => {
-        const dKey = String(d.id || d.timestamp || d.message_id);
-        DUELS_REGISTRY.set(dKey, d);
-      });
-      openDuelPopupById(targetDuelId, targetPlayer);
-    }, 400);
+    switchTab('duels', { skipRender: true });
+    await renderDuelsView(targetPlayer);
+    openDuelPopupById(targetDuelId, targetPlayer);
+    return;
+  }
+
+  if (targetTab === 'duels') {
+    switchTab('duels', { skipRender: true });
+    await renderDuelsView(targetPlayer);
+    return;
+  }
+
+  if (targetTab === 'hof' || targetTab === 'testers' || targetTab === 'rankings' || targetTab === 'rules' || targetTab === '2fa') {
+    switchTab(targetTab);
+    if (targetPlayer && targetTab !== '2fa') {
+      setTimeout(() => openProfile(targetPlayer), 200);
+    }
+    return;
+  }
+
+  if (targetPlayer) {
+    setTimeout(() => openProfile(targetPlayer), 200);
   }
 }
 
 function copyProfileLink(playerName) {
   const pName = playerName || CURRENT_PLAYER || '';
   if (!pName) return;
-  const baseUrl = window.location.origin + window.location.pathname;
-  const shareUrl = `${baseUrl}?player=${encodeURIComponent(pName)}`;
+  const shareUrl = `${siteShareBase()}?player=${encodeURIComponent(pName)}`;
   if (navigator.clipboard && navigator.clipboard.writeText) {
     navigator.clipboard.writeText(shareUrl).then(() => {
       showToast(`🔗 Copied profile link for ${pName}!`);
@@ -1421,7 +1811,7 @@ function copyProfileLink(playerName) {
 function copyEmbedCode(playerName) {
   const pName = playerName || CURRENT_PLAYER || '';
   if (!pName) return;
-  const embedCode = `<iframe src="${window.location.origin}${window.location.pathname}?player=${encodeURIComponent(pName)}" width="500" height="600" frameborder="0"></iframe>`;
+  const embedCode = `<iframe src="${siteShareBase()}?player=${encodeURIComponent(pName)}" width="500" height="600" frameborder="0"></iframe>`;
   if (navigator.clipboard && navigator.clipboard.writeText) {
     navigator.clipboard.writeText(embedCode).then(() => {
       showToast(`⚡ Copied embed code for ${pName}!`);
@@ -1434,23 +1824,21 @@ function copyEmbedCode(playerName) {
 }
 
 function showToast(msg) {
-  let toast = document.getElementById('toastNotification');
+  let toast = document.getElementById('toast') || document.getElementById('toastNotification');
   if (!toast) {
     toast = document.createElement('div');
-    toast.id = 'toastNotification';
-    toast.style.cssText = `
-      position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
-      background: rgba(13, 27, 42, 0.95); border: 1px solid var(--cyan);
-      box-shadow: 0 0 20px rgba(0, 238, 255, 0.4); color: #fff;
-      padding: 12px 24px; border-radius: 30px; font-family: var(--font-heading);
-      font-size: 0.9rem; font-weight: 700; z-index: 10000; opacity: 0; transition: opacity 0.3s ease;
-      pointer-events: none;
-    `;
+    toast.id = 'toast';
+    toast.className = 'toast';
     document.body.appendChild(toast);
   }
   toast.innerText = msg;
+  toast.classList.add('show');
   toast.style.opacity = '1';
-  setTimeout(() => { toast.style.opacity = '0'; }, 3000);
+  clearTimeout(showToast._hideTimer);
+  showToast._hideTimer = setTimeout(() => {
+    toast.classList.remove('show');
+    toast.style.opacity = '0';
+  }, 3200);
 }
 
 function animatePointsCount(targetPts) {
@@ -1573,46 +1961,74 @@ async function submitDuelFromSite() {
 
   const dateStr = new Date().toISOString().split('T')[0];
   const timestamp = Date.now();
+  const duelNumber = await allocateNextDuelIntegerId();
 
-  const recordP1 = { timestamp, date: dateStr, kit, outcome, player1: p1, player2: p2, player1_score: s1, player2_score: s2, result: winner.toLowerCase() === p1.toLowerCase() ? 'Won' : 'Lost' };
-  const recordP2 = { timestamp, date: dateStr, kit, outcome, player1: p1, player2: p2, player1_score: s1, player2_score: s2, result: winner.toLowerCase() === p2.toLowerCase() ? 'Won' : 'Lost' };
+  const recordP1 = { duel_number: duelNumber, id: duelNumber, timestamp, date: dateStr, kit, outcome, winner, player1: p1, player2: p2, player1_score: s1, player2_score: s2, result: winner.toLowerCase() === p1.toLowerCase() ? 'Won' : 'Lost' };
+  const recordP2 = { duel_number: duelNumber, id: duelNumber, timestamp, date: dateStr, kit, outcome, winner, player1: p1, player2: p2, player1_score: s1, player2_score: s2, result: winner.toLowerCase() === p2.toLowerCase() ? 'Won' : 'Lost' };
+
+  if (!auth || !auth.currentUser) {
+    return alert("Sign in with Google is required to submit a duel. GitHub Pages cannot use the Admin SDK.");
+  }
 
   showToast("Submitting duel & updating rankings...");
 
   try {
+    let p1List = [];
+    let p2List = [];
     if (db) {
-      const p1Ref = db.collection('duels').doc(p1);
-      const p1Doc = await p1Ref.get();
-      let p1List = p1Doc.exists && Array.isArray(p1Doc.data().duels) ? p1Doc.data().duels : [];
-      p1List.unshift(recordP1);
-      await p1Ref.set({ player: p1, duels: p1List, count: p1List.length, last_updated: dateStr }, { merge: true });
-
-      const p2Ref = db.collection('duels').doc(p2);
-      const p2Doc = await p2Ref.get();
-      let p2List = p2Doc.exists && Array.isArray(p2Doc.data().duels) ? p2Doc.data().duels : [];
-      p2List.unshift(recordP2);
-      await p2Ref.set({ player: p2, duels: p2List, count: p2List.length, last_updated: dateStr }, { merge: true });
-
-      if (newTier) {
-        const kitRef = db.collection('rankings').doc(kit);
-        const kitDoc = await kitRef.get();
-        let kitData = kitDoc.exists ? kitDoc.data() : {};
-        if (kitData.tiers) kitData = kitData.tiers;
-
-        for (let t in kitData) {
-          if (Array.isArray(kitData[t])) {
-            kitData[t] = kitData[t].filter(name => name.toLowerCase() !== winner.toLowerCase());
-          }
-        }
-        if (!kitData[newTier]) kitData[newTier] = [];
-        if (!kitData[newTier].includes(winner)) kitData[newTier].push(winner);
-
-        await kitRef.set({ tiers: kitData }, { merge: true });
-        DATA[kit] = kitData;
-        computeOverallPoints();
+      try {
+        const p1Doc = await db.collection('duels').doc(p1).get();
+        p1List = p1Doc.exists && Array.isArray(p1Doc.data().duels) ? p1Doc.data().duels : [];
+      } catch (e) {
+        console.warn('Could not read existing P1 duels:', e.message);
+      }
+      try {
+        const p2Doc = await db.collection('duels').doc(p2).get();
+        p2List = p2Doc.exists && Array.isArray(p2Doc.data().duels) ? p2Doc.data().duels : [];
+      } catch (e) {
+        console.warn('Could not read existing P2 duels:', e.message);
       }
     }
+    p1List.unshift(recordP1);
+    p2List.unshift(recordP2);
 
+    await firestoreWriteDoc('duels', p1, { player: p1, duels: p1List, count: p1List.length, last_updated: dateStr });
+    await firestoreWriteDoc('duels', p2, { player: p2, duels: p2List, count: p2List.length, last_updated: dateStr });
+    try {
+      await firestoreWriteDoc('duels', 'all_duels', { total_count: duelNumber });
+    } catch (e) {
+      console.warn('Could not persist duels/all_duels total_count:', e.message);
+    }
+    noteDuelIntegerId(duelNumber);
+
+    if (newTier) {
+      let kitData = {};
+      if (db) {
+        try {
+          const kitDoc = await db.collection('rankings').doc(kit).get();
+          kitData = kitDoc.exists ? kitDoc.data() : {};
+        } catch (e) {
+          kitData = DATA[kit] ? { tiers: DATA[kit] } : {};
+        }
+      } else if (DATA[kit]) {
+        kitData = { tiers: DATA[kit] };
+      }
+      if (kitData.tiers) kitData = kitData.tiers;
+
+      for (let t in kitData) {
+        if (Array.isArray(kitData[t])) {
+          kitData[t] = kitData[t].filter(name => String(name).toLowerCase() !== winner.toLowerCase());
+        }
+      }
+      if (!kitData[newTier]) kitData[newTier] = [];
+      if (!kitData[newTier].includes(winner)) kitData[newTier].push(winner);
+
+      await firestoreWriteDoc('rankings', kit, { tiers: kitData });
+      DATA[kit] = kitData;
+      computeOverallPoints();
+    }
+
+    try { localStorage.removeItem('MTCTIERS_DUELS_CACHE_V2'); } catch (e) {}
     closeSubmitDuelModal();
     showToast("⚔️ Duel recorded & Tier updated!");
     renderCurrentTab();
@@ -1621,17 +2037,28 @@ async function submitDuelFromSite() {
   }
 }
 
+function selectProfileEmote(emoji) {
+  const input = document.getElementById('epEmote');
+  if (input) input.value = emoji;
+  document.querySelectorAll('.emote-option').forEach(el => {
+    el.classList.toggle('selected', el.innerText.trim() === emoji || (emoji === '' && el.innerText.includes('None')));
+  });
+}
+
 function openEditProfileModal() {
   if (!CURRENT_PLAYER) return;
-  const pDetail = getPlayerMeta(CURRENT_PLAYER);
 
+  const pDetail = getPlayerMeta(CURRENT_PLAYER);
   document.getElementById('epSub').innerText = `Editing profile for ${CURRENT_PLAYER}`;
   document.getElementById('epSkinUrl').value = pDetail.skinUrl || '';
   document.getElementById('epBannerUrl').value = pDetail.bannerUrl || '';
+  document.getElementById('epEmote').value = pDetail.customEmote || pDetail.emote || '';
   document.getElementById('epColor').value = pDetail.accentColor || '#00eeff';
   document.getElementById('epLfm').value = pDetail.lfm ? 'ON' : 'OFF';
   document.getElementById('epRival').value = pDetail.rival || '';
   document.getElementById('epDesc').value = pDetail.description || '';
+
+  selectProfileEmote(pDetail.customEmote || pDetail.emote || '');
 
   document.getElementById('editProfileModalOverlay').classList.add('active');
 }
@@ -1658,6 +2085,7 @@ async function saveProfileCustomization() {
 
   const rawSkin = document.getElementById('epSkinUrl').value.trim();
   const rawBanner = document.getElementById('epBannerUrl').value.trim();
+  const rawEmote = document.getElementById('epEmote').value.trim();
   const accentColor = document.getElementById('epColor').value;
   const lfm = document.getElementById('epLfm').value === 'ON';
   const rawRival = document.getElementById('epRival').value.trim();
@@ -1674,6 +2102,7 @@ async function saveProfileCustomization() {
     return alert("Invalid Banner Image URL! Must start with http:// or https://");
   }
 
+  const customEmote = escapeHTML(rawEmote).slice(0, 10);
   const rival = escapeHTML(rawRival).slice(0, 50);
   const description = escapeHTML(rawDesc).slice(0, 500);
 
@@ -1685,12 +2114,14 @@ async function saveProfileCustomization() {
     name: CURRENT_PLAYER,
     skinUrl,
     bannerUrl,
+    customEmote,
     accentColor: /^#[0-9a-fA-F]{6}$/.test(accentColor) ? accentColor : '#00eeff',
     lfm,
     rival,
     description
   };
 
+  const previousPlayers = JSON.parse(JSON.stringify(DATA.Players || []));
   if (pIndex !== -1) {
     DATA.Players[pIndex] = updatedObj;
   } else {
@@ -1701,49 +2132,13 @@ async function saveProfileCustomization() {
   showToast("Saving profile customization...");
 
   try {
-    let saved = false;
-    if (db) {
-      try {
-        await db.collection('rankings').doc('players_meta').set({ players: DATA.Players }, { merge: true });
-        saved = true;
-      } catch (err) {
-        console.warn("Firestore SDK write note:", err.message);
-      }
-    }
-
-    if (!saved) {
-      let idToken = '';
-      if (auth && auth.currentUser) {
-        try { idToken = await auth.currentUser.getIdToken(); } catch (e) {}
-      }
-      const headers = { 'Content-Type': 'application/json' };
-      if (idToken) headers['Authorization'] = `Bearer ${idToken}`;
-
-      const patchRes = await fetch("https://firestore.googleapis.com/v1/projects/mtctiers/databases/(default)/documents/rankings/players_meta?updateMask.fieldPaths=players", {
-        method: 'PATCH',
-        headers,
-        body: JSON.stringify({
-          fields: {
-            players: {
-              arrayValue: {
-                values: DATA.Players.map(pyToFirestoreValue)
-              }
-            }
-          }
-        })
-      });
-
-      if (!patchRes.ok) {
-        const errJson = await patchRes.json().catch(() => ({}));
-        throw new Error(errJson.error?.message || `HTTP ${patchRes.status} Error`);
-      }
-    }
-
+    await firestoreWriteDoc('rankings', 'players_meta', { players: DATA.Players });
     closeEditProfileModal();
     openProfile(CURRENT_PLAYER);
     renderCurrentTab();
     showToast("✨ Profile updated successfully on Firebase!");
   } catch (e) {
+    DATA.Players = previousPlayers;
     alert("❌ Failed to save profile to Firebase database: " + e.message);
   }
 }
@@ -1774,6 +2169,16 @@ function closeAdminDashModalOnBackdrop(e) {
 
 function renderWhitelistItems() {
   const container = document.getElementById('whitelistItemsList');
+  const noteEl = document.getElementById('whitelistFirestoreNote');
+  if (noteEl) {
+    if (firestoreReadDenied) {
+      noteEl.style.display = 'block';
+      noteEl.innerText = 'Live rankings/whitelist documents are not publicly readable (Firestore HTTP 403). This list is the site hash fallback. Writes still require a signed-in admin that existing rules already allow — this site does not open public write rules. The Discord bot/Admin SDK is the durable store.';
+    } else {
+      noteEl.style.display = 'none';
+      noteEl.innerText = '';
+    }
+  }
   if (!container) return;
 
   if (!WHITELIST_ENTRIES || !WHITELIST_ENTRIES.length) {
@@ -1799,7 +2204,17 @@ function renderWhitelistItems() {
   }).join('');
 }
 
+async function persistWhitelistEntries() {
+  if (!IS_ADMIN) throw new Error('Whitelisted admin access required.');
+  const hashes = WHITELIST_ENTRIES.map(e => e.hash);
+  await firestoreWriteDoc('rankings', 'whitelist', {
+    hashes,
+    entries: JSON.stringify(WHITELIST_ENTRIES)
+  });
+}
+
 async function addEmailToWhitelist() {
+  if (!IS_ADMIN) return alert("Whitelisted admin access required.");
   const input = document.getElementById('adNewEmail');
   const roleSelect = document.getElementById('adRole');
   const playerSelect = document.getElementById('adAssignedPlayer');
@@ -1811,7 +2226,7 @@ async function addEmailToWhitelist() {
   if (!val) return alert("Please enter an email or username");
 
   const newHash = await sha256Hex(val);
-
+  const previous = WHITELIST_ENTRIES.slice();
   let existingIndex = WHITELIST_ENTRIES.findIndex(e => e.hash === newHash || (e.label && e.label.toLowerCase().includes(val)));
 
   const newEntry = {
@@ -1831,93 +2246,57 @@ async function addEmailToWhitelist() {
   renderWhitelistItems();
 
   try {
-    if (db) {
-      const hashes = WHITELIST_ENTRIES.map(e => e.hash);
-      await db.collection('rankings').doc('whitelist').set({
-        hashes,
-        entries: JSON.stringify(WHITELIST_ENTRIES)
-      });
-      showToast(`Saved ${val} permissions (${role.toUpperCase()})!`);
-    }
+    await persistWhitelistEntries();
+    showToast(`Saved ${val} permissions (${role.toUpperCase()})!`);
   } catch (e) {
+    WHITELIST_ENTRIES = previous;
+    renderWhitelistItems();
     alert("Failed to update whitelist: " + e.message);
   }
 }
 
 async function removeEmailFromWhitelist(targetHash) {
+  if (!IS_ADMIN) return alert("Whitelisted admin access required.");
+  const previous = WHITELIST_ENTRIES.slice();
   WHITELIST_ENTRIES = WHITELIST_ENTRIES.filter(e => e.hash !== targetHash);
   renderWhitelistItems();
 
   try {
-    if (db) {
-      const hashes = WHITELIST_ENTRIES.map(e => e.hash);
-      await db.collection('rankings').doc('whitelist').set({
-        hashes,
-        entries: JSON.stringify(WHITELIST_ENTRIES)
-      });
-      showToast(`Removed entry from Whitelist`);
-    }
+    await persistWhitelistEntries();
+    showToast(`Removed entry from Whitelist`);
   } catch (e) {
+    WHITELIST_ENTRIES = previous;
+    renderWhitelistItems();
     alert("Failed to update whitelist: " + e.message);
   }
 }
 
+let searchDebounceTimer = null;
 function handleSearch(val) {
-  const popup = document.getElementById('searchPopup');
-  if (!val.trim()) {
-    popup.style.display = 'none';
-    return;
-  }
+  clearTimeout(searchDebounceTimer);
+  searchDebounceTimer = setTimeout(() => {
+    const popup = document.getElementById('searchPopup');
+    if (!val.trim()) {
+      popup.style.display = 'none';
+      return;
+    }
 
-  const matches = Object.keys(DATA.Overall || {}).filter(name => 
-    name.toLowerCase().includes(val.toLowerCase())
-  ).slice(0, 6);
+    const matches = Object.keys(DATA.Overall || {}).filter(name => 
+      name.toLowerCase().includes(val.toLowerCase())
+    ).slice(0, 6);
 
-  if (matches.length === 0) {
-    popup.innerHTML = `<div class="search-item"><span>No player found</span></div>`;
-  } else {
-    popup.innerHTML = matches.map(m => `
-      <div class="search-item" onclick="openProfile('${m}');document.getElementById('searchPopup').style.display='none';">
-        <b>${m}</b>
-        <span>VIEW PROFILE</span>
-      </div>
-    `).join('');
-  }
-  popup.style.display = 'block';
-}
-
-function copyProfileLink() {
-  if (!CURRENT_PLAYER) return;
-  const url = new URL(window.location.href);
-  url.searchParams.set('player', CURRENT_PLAYER);
-  navigator.clipboard.writeText(url.toString()).then(() => showToast("Profile link copied!"));
-}
-
-function copyEmbedCode() {
-  if (!CURRENT_PLAYER) return;
-  const url = new URL(window.location.href);
-  url.searchParams.set('player', CURRENT_PLAYER);
-  const code = `<iframe src="${url.toString()}" width="500" height="400" style="border:none;border-radius:16px;"></iframe>`;
-  navigator.clipboard.writeText(code).then(() => showToast("Embed iframe code copied!"));
-}
-
-function showToast(msg) {
-  const toast = document.getElementById('toast');
-  toast.innerText = msg;
-  toast.classList.add('show');
-  setTimeout(() => toast.classList.remove('show'), 2500);
-}
-
-function handleUrlParamsOnLoad() {
-  const params = new URLSearchParams(window.location.search);
-  const player = params.get('player');
-  const tab = params.get('tab');
-  if (tab === 'duels' || tab === 'hof' || tab === 'testers' || tab === 'rankings') {
-    switchTab(tab);
-  }
-  if (player && DATA.Overall && player in DATA.Overall) {
-    openProfile(player);
-  }
+    if (matches.length === 0) {
+      popup.innerHTML = `<div class="search-item"><span>No player found</span></div>`;
+    } else {
+      popup.innerHTML = matches.map(m => `
+        <div class="search-item" onclick="openProfile('${m}');document.getElementById('searchPopup').style.display='none';">
+          <b>${m}</b>
+          <span>VIEW PROFILE</span>
+        </div>
+      `).join('');
+    }
+    popup.style.display = 'block';
+  }, 100);
 }
 
 let audioPlayer = null;
@@ -2445,5 +2824,299 @@ async function fetchAndRenderChangelog() {
   } catch (e) {
     console.warn("Changelog fetch note:", e.message);
     el.innerHTML = '<div class="dash-empty">Could not load changelog.</div>';
+  }
+}
+/* 🔐 2FA AUTHENTICATOR & PWA MOBILE / PC SYSTEM */
+
+// Base32 Decoder
+function base32ToBytes(base32Str) {
+  const base32chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+  let bits = '';
+  let bytes = [];
+  const clean = (base32Str || '').toUpperCase().replace(/[^A-Z2-7]/g, '');
+
+  for (let i = 0; i < clean.length; i++) {
+    const val = base32chars.indexOf(clean.charAt(i));
+    bits += val.toString(2).padStart(5, '0');
+  }
+
+  for (let i = 0; i + 8 <= bits.length; i += 8) {
+    bytes.push(parseInt(bits.substr(i, 8), 2));
+  }
+
+  return new Uint8Array(bytes);
+}
+
+// Base32 Secret Generator
+function generateBase32Secret(length = 16) {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+  let secret = '';
+  const array = new Uint8Array(length);
+  crypto.getRandomValues(array);
+  for (let i = 0; i < length; i++) {
+    secret += chars[array[i] % chars.length];
+  }
+  return secret;
+}
+
+// Pure JavaScript RFC 6238 TOTP Generator (100% Offline via Web Crypto API)
+async function generateTOTPCode(secretBase32) {
+  try {
+    const secretBytes = base32ToBytes(secretBase32);
+    if (!secretBytes.length) return "000000";
+
+    const timeStep = 30;
+    const epoch = Math.floor(Date.now() / 1000);
+    const counter = Math.floor(epoch / timeStep);
+
+    const buffer = new ArrayBuffer(8);
+    const view = new DataView(buffer);
+    view.setUint32(4, counter, false);
+
+    const key = await crypto.subtle.importKey(
+      'raw',
+      secretBytes,
+      { name: 'HMAC', hash: 'SHA-1' },
+      false,
+      ['sign']
+    );
+
+    const signature = await crypto.subtle.sign('HMAC', key, buffer);
+    const sigBytes = new Uint8Array(signature);
+    const offset = sigBytes[sigBytes.length - 1] & 0xf;
+
+    const code = (
+      ((sigBytes[offset] & 0x7f) << 24) |
+      ((sigBytes[offset + 1] & 0xff) << 16) |
+      ((sigBytes[offset + 2] & 0xff) << 8) |
+      (sigBytes[offset + 3] & 0xff)
+    ) % 1000000;
+
+    return String(code).padStart(6, '0');
+  } catch (err) {
+    console.warn("TOTP generation note:", err.message);
+    return "000000";
+  }
+}
+
+let totpIntervalId = null;
+
+async function render2faView() {
+  const displayList = document.getElementById('displayList');
+  if (!displayList) return;
+
+  const currentAccount = CURRENT_USER ? (CURRENT_USER.email || CURRENT_USER.displayName || 'GuestUser') : 'MTCTiersPlayer';
+  let storedSecret = localStorage.getItem(`mtc_2fa_secret_${currentAccount}`);
+
+  if (!storedSecret) {
+    storedSecret = generateBase32Secret(16);
+    localStorage.setItem(`mtc_2fa_secret_${currentAccount}`, storedSecret);
+  }
+
+  const initialCode = await generateTOTPCode(storedSecret);
+  const formattedCode = initialCode.slice(0, 3) + ' ' + initialCode.slice(3);
+  const otpUrl = `otpauth://totp/MTCTiers:${encodeURIComponent(currentAccount)}?secret=${storedSecret}&issuer=MTCTiers`;
+  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(otpUrl)}`;
+
+  displayList.innerHTML = `
+    <div class="totp-container">
+      <div class="totp-header">
+        <span class="totp-icon">🔐</span>
+        <h2 class="totp-title">MTCTIERS 2FA AUTHENTICATOR</h2>
+      </div>
+      <p class="totp-subtitle">Official Mobile & Desktop PWA 2FA Security App — Works 100% Offline!</p>
+
+      <div class="totp-card">
+        <div style="font-size:0.8rem;color:var(--text-muted);letter-spacing:1px;">ACCOUNT: <strong style="color:#fff;">${currentAccount}</strong></div>
+        <div class="totp-code-display" id="totpLiveCode">${formattedCode}</div>
+        
+        <div class="totp-timer-wrap">
+          <svg class="totp-timer-svg" viewBox="0 0 24 24">
+            <circle class="totp-timer-circle" id="totpTimerCircle" cx="12" cy="12" r="10"></circle>
+          </svg>
+          <span>REFRESHES IN <strong id="totpSeconds">30</strong>s</span>
+        </div>
+      </div>
+
+      <div class="totp-secret-box">
+        <span>SECRET: <strong id="totpSecretText">${storedSecret}</strong></span>
+        <button class="auth-btn" style="padding:6px 12px;font-size:0.75rem;" onclick="copy2faSecret('${storedSecret}')">COPY SECRET</button>
+      </div>
+
+      <img src="${qrUrl}" alt="2FA QR Code" class="totp-qr-img" onerror="this.style.display='none'">
+      <div style="font-size:0.75rem;color:var(--text-muted);margin-top:4px;">Scan with Google Authenticator, Authy, or MTCTiers Mobile App</div>
+
+      <div style="margin-top:20px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">
+        <input type="text" id="totpTestInput" class="form-input" style="max-width:180px;text-align:center;font-size:1.1rem;font-weight:900;letter-spacing:2px;" placeholder="000000" maxlength="6">
+        <button class="auth-btn" onclick="verify2faCode('${storedSecret}')">VERIFY 2FA CODE</button>
+        <button class="btn-pwa-install" onclick="regenerate2faSecret('${currentAccount}')">REGENERATE KEY</button>
+      </div>
+    </div>
+  `;
+
+  startTotpLiveLoop(storedSecret);
+}
+
+function startTotpLiveLoop(secret) {
+  if (totpIntervalId) clearInterval(totpIntervalId);
+
+  const update = async () => {
+    const epoch = Math.floor(Date.now() / 1000);
+    const secondsLeft = 30 - (epoch % 30);
+    const secEl = document.getElementById('totpSeconds');
+    const circleEl = document.getElementById('totpTimerCircle');
+    const codeEl = document.getElementById('totpLiveCode');
+
+    if (secEl) secEl.innerText = secondsLeft;
+    if (circleEl) {
+      const offset = 63 * (1 - (secondsLeft / 30));
+      circleEl.style.strokeDashoffset = offset;
+    }
+
+    if (codeEl) {
+      const code = await generateTOTPCode(secret);
+      codeEl.innerText = code.slice(0, 3) + ' ' + code.slice(3);
+    }
+  };
+
+  update();
+  totpIntervalId = setInterval(update, 1000);
+}
+
+function copy2faSecret(secret) {
+  navigator.clipboard.writeText(secret).then(() => {
+    showToast('🔑 2FA Secret Key copied to clipboard!');
+  }).catch(() => {
+    showToast(`Secret: ${secret}`);
+  });
+}
+
+async function verify2faCode(secret) {
+  const inputEl = document.getElementById('totpTestInput');
+  const userVal = (inputEl ? inputEl.value : '').replace(/\s+/g, '').trim();
+  const validCode = await generateTOTPCode(secret);
+
+  if (userVal === validCode) {
+    showToast('✅ 2FA Code Verified Successfully! Account Secure.');
+  } else {
+    showToast('❌ Invalid 2FA Security Code. Try again.');
+  }
+}
+
+function regenerate2faSecret(account) {
+  if (confirm('Regenerate 2FA Secret Key? You will need to re-pair Google Authenticator / MTCTiers App.')) {
+    const newSecret = generateBase32Secret(16);
+    localStorage.setItem(`mtc_2fa_secret_${account}`, newSecret);
+    showToast('🔑 New 2FA Secret Key generated!');
+    render2faView();
+  }
+}
+
+/* 📲 PWA EVENT LISTENERS & SERVICE WORKER */
+let deferredPwaPrompt = null;
+
+function isIosDevice() {
+  return /iPhone|iPad|iPod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+}
+
+function isCurrentDeviceMobile() {
+  return window.innerWidth <= 768 || /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+}
+
+function isPwaInstalledOnCurrentDevice() {
+  const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+  if (isStandalone) return true;
+
+  const onMobile = isCurrentDeviceMobile();
+  const key = onMobile ? 'pwa_installed_mobile' : 'pwa_installed_pc';
+  return localStorage.getItem(key) === 'true';
+}
+
+function checkAppInstalledState() {
+  const pwaBtn = document.getElementById('pwaInstallBtn');
+  const pwaBanner = document.getElementById('pwaBanner');
+
+  if (isPwaInstalledOnCurrentDevice()) {
+    if (pwaBtn) pwaBtn.style.display = 'none';
+    if (pwaBanner) pwaBanner.style.display = 'none';
+  } else {
+    const shouldShow = deferredPwaPrompt || isIosDevice() || isCurrentDeviceMobile();
+    if (shouldShow) {
+      if (pwaBtn) pwaBtn.style.display = 'inline-flex';
+      if (pwaBanner && !localStorage.getItem('pwa_banner_closed')) {
+        pwaBanner.style.display = 'block';
+      }
+    }
+  }
+}
+
+window.addEventListener('appinstalled', () => {
+  const key = isCurrentDeviceMobile() ? 'pwa_installed_mobile' : 'pwa_installed_pc';
+  localStorage.setItem(key, 'true');
+  showToast('🎉 MTCTiers App Installed Successfully!');
+  checkAppInstalledState();
+});
+
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredPwaPrompt = e;
+  if (isPwaInstalledOnCurrentDevice()) {
+    checkAppInstalledState();
+    return;
+  }
+  const pwaBtn = document.getElementById('pwaInstallBtn');
+  const pwaBanner = document.getElementById('pwaBanner');
+  if (pwaBtn) pwaBtn.style.display = 'inline-flex';
+  if (pwaBanner && !localStorage.getItem('pwa_banner_closed')) {
+    pwaBanner.style.display = 'block';
+  }
+});
+
+function promptPwaInstall() {
+  if (deferredPwaPrompt) {
+    deferredPwaPrompt.prompt();
+    deferredPwaPrompt.userChoice.then((choiceResult) => {
+      if (choiceResult.outcome === 'accepted') {
+        const key = isCurrentDeviceMobile() ? 'pwa_installed_mobile' : 'pwa_installed_pc';
+        localStorage.setItem(key, 'true');
+        showToast('🎉 MTCTiers App Installed!');
+        checkAppInstalledState();
+      }
+      deferredPwaPrompt = null;
+    });
+  } else if (isIosDevice()) {
+    alert('📱 How to install MTCTiers App on iPhone / iPad:\n\n1. Tap the Share button (square with arrow ↑) at the bottom of Safari.\n2. Scroll down and tap "Add to Home Screen" ➕\n3. Tap "Add" in the top right corner!');
+  } else {
+    showToast('📱 Tap browser menu ➔ "Add to Home Screen" or "Install App"');
+  }
+}
+
+function closePwaBanner() {
+  const pwaBanner = document.getElementById('pwaBanner');
+  if (pwaBanner) pwaBanner.style.display = 'none';
+  localStorage.setItem('pwa_banner_closed', 'true');
+}
+
+// Service Worker Registration
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js')
+      .then(reg => console.log('⚡ [PWA] Service Worker registered:', reg.scope))
+      .catch(err => console.warn('[PWA] Service Worker registration note:', err.message));
+  });
+}
+
+// Offline Connection Event Listeners
+window.addEventListener('online', updateOnlineStatus);
+window.addEventListener('offline', updateOnlineStatus);
+
+function updateOnlineStatus() {
+  const offlineInd = document.getElementById('offlineIndicator');
+  if (!navigator.onLine) {
+    if (offlineInd) offlineInd.style.display = 'block';
+    showToast('📡 Connection Offline. Local Rankings & 2FA Active!');
+  } else {
+    if (offlineInd) offlineInd.style.display = 'none';
+    showToast('🟢 Online Connection Restored!');
   }
 }

@@ -15,6 +15,35 @@ const TIER_TESTERS = [
   { userId: null, ign: 'ChillPotato', tag: 'ChillPotato (No Discord)' }
 ];
 
+function buildOldStyleResultMessage({ playerMention, playerIgn, kit, outcome, prevRank, score, testerMention, testerIgn }) {
+  const lines = [];
+  const outcomeLower = outcome.toLowerCase();
+  const isFailed = outcomeLower.includes('fail');
+  const isDemoted = outcomeLower.includes('demot');
+
+  let header;
+  if (isFailed) {
+    header = `${playerMention} - \`${playerIgn}\` failed **${outcome}** in ${kit}`;
+  } else if (isDemoted) {
+    header = `${playerMention} - \`${playerIgn}\` has been demoted to **${outcome}** in ${kit}`;
+  } else {
+    header = `${playerMention} - \`${playerIgn}\` has been promoted to **${outcome}** in ${kit}`;
+  }
+  lines.push(header);
+
+  if (!isFailed) {
+    lines.push('');
+    lines.push('**Previous Rank**');
+    lines.push(`> ${prevRank || 'Unranked'}`);
+  }
+
+  lines.push('');
+  lines.push(`**${outcome} Fight**`);
+  lines.push(`> ${score} against ${testerMention} - \`${testerIgn}\``);
+
+  return lines.join('\n');
+}
+
 function isTesterOrAdmin(member, userId) {
   if (TIER_TESTERS.some(t => t.userId === userId)) return true;
   if (!member) return false;
@@ -427,15 +456,19 @@ async function handleQueueModal(interaction) {
       await db.patchDoc('rankings', 'players_meta', { players: rankings.Players || [] });
     }
 
-    // 2. Build test result embed
-    const embed = buildTestResultEmbed({
-      player: ign,
-      tester: interaction.user.id,
-      region: 'NA',
-      prevRank,
-      rankEarned: outcome,
+    // 2. Build old-style plain-text result message
+    const testerEntry = TIER_TESTERS.find(t => t.userId === interaction.user.id);
+    const testerIgn = testerEntry ? testerEntry.ign : interaction.user.username;
+
+    const msg = buildOldStyleResultMessage({
+      playerMention: `<@${targetUserId}>`,
+      playerIgn: ign,
       kit,
-      score
+      outcome,
+      prevRank,
+      score,
+      testerMention: `<@${interaction.user.id}>`,
+      testerIgn
     });
 
     // 3. Post to tiertesters chat (1488183052407406723)
@@ -443,8 +476,8 @@ async function handleQueueModal(interaction) {
     try {
       const targetChan = await interaction.client.channels.fetch(TARGET_RESULTS_CHANNEL).catch(() => null);
       if (targetChan) {
-        await targetChan.send({ embeds: [embed] });
-        postedNote = ` and result embed posted to <#${TARGET_RESULTS_CHANNEL}>`;
+        await targetChan.send(msg);
+        postedNote = ` and result posted to <#${TARGET_RESULTS_CHANNEL}>`;
       }
     } catch (e) {
       console.warn('Error sending test result to tiertesters channel:', e.message);

@@ -1,11 +1,12 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <!-- Google tag (gtag.js) -->
   <script async src="https://www.googletagmanager.com/gtag/js?id=G-RGZ8Z63C6V"></script>
   <script>
     window.dataLayer = window.dataLayer || [];
-    function gtag(){dataLayer.push(arguments);}
+    function gtag() { dataLayer.push(arguments); }
     gtag('js', new Date());
 
     gtag('config', 'G-RGZ8Z63C6V');
@@ -16,18 +17,31 @@
   <meta name="description" content="Official MultiCraft PvP Tierlist, Rankings & Player Profiles.">
 
   <link rel="icon" type="image/png" href="assets/mtctiers.png">
+  <link rel="manifest" href="manifest.json?v=20260826_2">
+  <meta name="theme-color" content="#00eeff">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="MTCTiers">
+  <link rel="apple-touch-icon" href="assets/mtctiers.png">
 
-  <link rel="stylesheet" href="index.css">
+  <link rel="stylesheet" href="index.css?v=20260826_2">
 
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 </head>
+
 <body>
+
+  <div id="offlineIndicator" class="offline-indicator" style="display:none;">
+    📡 <span>Offline Mode Active — 2FA Authenticator & Local Rankings Ready</span>
+  </div>
 
   <div id="enterScreen" class="enter-screen" onclick="enterSite()">
     <div class="enter-content">
-      <img src="assets/mtctiers.png" alt="MTC Tiers Logo" class="enter-logo" onerror="this.src='assets/mtctiers_default_skin.png'">
+      <img src="assets/mtctiers.png" alt="MTC Tiers Logo" class="enter-logo"
+        onerror="this.src='assets/mtctiers_default_skin.png'">
       <h1 class="enter-title">MTC TIERS</h1>
       <p class="enter-subtitle">OFFICIAL PLAYER RANKINGS & PROFILES</p>
       <div class="enter-btn">
@@ -38,8 +52,9 @@
   </div>
 
   <nav class="navbar">
-    <div class="nav-brand" onclick="switchTab('dashboard')">
-      <img src="assets/mtctiers.png" alt="MTC Tiers Logo" class="nav-logo" onerror="this.src='assets/mtctiers_default_skin.png'">
+    <div class="nav-brand" onclick="switchTab('home')">
+      <img src="assets/mtctiers.png" alt="MTC Tiers Logo" class="nav-logo"
+        onerror="this.src='assets/mtctiers_default_skin.png'">
       <span class="nav-title">MTC TIERS</span>
     </div>
 
@@ -55,7 +70,12 @@
     </div>
 
     <div class="nav-right">
-      <button id="adminDashBtn" class="btn-admin-dash" onclick="openAdminDashModal()" style="display:none;" title="Admin Whitelist Manager">
+      <button id="pwaInstallBtn" class="btn-pwa-install" onclick="promptPwaInstall()" style="display:none;"
+        title="Install Native MTCTiers App">
+        <span>📲 INSTALL APP</span>
+      </button>
+      <button id="adminDashBtn" class="btn-admin-dash" onclick="openAdminDashModal()" style="display:none;"
+        title="Admin Whitelist Manager">
         <span>⚙️ WHITELIST</span>
       </button>
       <button id="adminDuelBtn" class="btn-admin-duel" onclick="openSubmitDuelModal()" style="display:none;">
@@ -63,18 +83,46 @@
       </button>
       <div id="navAuth" class="nav-auth">
         <button id="loginBtn" class="btn-login" onclick="loginWithGoogle()">
-          <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" style="width:16px;height:16px;margin-right:6px;vertical-align:middle;">
+          <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google"
+            style="width:16px;height:16px;margin-right:6px;vertical-align:middle;">
           <span>LOGIN WITH GOOGLE</span>
         </button>
-        <div id="userProfile" class="user-profile" style="display:none;" onclick="logoutUser()" title="Click to Logout">
+        <div id="userProfile" class="user-profile" style="display:none;" onclick="toggleUserAccountMenu(event)" title="Account Options">
           <img id="userAvatar" src="assets/mtctiers_default_skin.png" class="user-avatar" alt="User">
           <span id="userName" class="user-name"></span>
           <span id="adminTag" class="admin-tag" style="display:none;">ADMIN</span>
+          <span class="menu-caret">▾</span>
+
+          <div id="userAccountMenu" class="user-account-menu" onclick="event.stopPropagation()">
+            <div class="user-menu-header">
+              <div class="user-menu-name" id="menuUserName">User</div>
+              <div class="user-menu-email" id="menuUserEmail">user@gmail.com</div>
+            </div>
+            <div class="user-menu-divider"></div>
+            <div class="user-menu-item" onclick="openMyPlayerProfile()">
+              <span class="user-menu-icon">👤</span>
+              <span>View My Profile</span>
+            </div>
+            <div class="user-menu-item" onclick="openMyProfileCustomization()">
+              <span class="user-menu-icon">✏️</span>
+              <span>Profile Settings (PFP, Banner, Emoji)</span>
+            </div>
+            <div class="user-menu-item" id="menu2faItem" onclick="openMy2faSecurity()">
+              <span class="user-menu-icon">🔐</span>
+              <span>Account Settings & 2FA</span>
+            </div>
+            <div class="user-menu-divider"></div>
+            <div class="user-menu-item logout" onclick="logoutUser()">
+              <span class="user-menu-icon">🚪</span>
+              <span>Logout</span>
+            </div>
+          </div>
         </div>
       </div>
       <div class="search-wrap">
         <span class="search-icon">🔍</span>
-        <input type="text" id="playerSearch" class="search-input" placeholder="Search player..." oninput="handleSearch(this.value)" autocomplete="off">
+        <input type="text" id="playerSearch" class="search-input" placeholder="Search player..."
+          oninput="handleSearch(this.value)" autocomplete="off">
         <div id="searchPopup" class="search-popup"></div>
       </div>
     </div>
@@ -161,7 +209,10 @@
 
       <div class="profile-banner" id="pBanner">
         <div class="modal-actions">
-          <button id="pEditBtn" class="icon-btn" title="Edit Profile Settings (BG, PFP, Color)" onclick="openEditProfileModal()" style="display:none;background:rgba(0,238,255,0.2);border-color:var(--cyan);color:#fff;font-weight:700;">✏️ EDIT</button>
+          <button id="pEditBtn" class="icon-btn" title="Edit Profile Settings (BG, PFP, Color)"
+            onclick="openEditProfileModal()"
+            style="display:none;background:rgba(0,238,255,0.2);border-color:var(--cyan);color:#fff;font-weight:700;">✏️
+            EDIT</button>
           <button class="icon-btn" title="Copy Profile Link" onclick="copyProfileLink()">🔗</button>
           <button class="icon-btn" title="Embed Profile" onclick="copyEmbedCode()">⚡</button>
           <button class="icon-btn" title="Close" onclick="closeProfileModal()">✕</button>
@@ -172,7 +223,8 @@
 
         <div class="profile-top-row">
           <div class="avatar-preview-box">
-            <img src="assets/steve.png" alt="Player Avatar" id="pSkinImg" class="avatar-preview-img" onerror="this.src='assets/steve.png'">
+            <img src="assets/steve.png" alt="Player Avatar" id="pSkinImg" class="avatar-preview-img"
+              onerror="this.src='assets/steve.png'">
           </div>
 
           <div class="player-meta-box">
@@ -220,14 +272,15 @@
         <div class="music-artist" id="musicTrackName">MTC Tiers Theme</div>
       </div>
     </div>
-    
+
     <div class="music-controls">
       <button class="music-btn" id="musicPlayBtn" onclick="toggleMusicPlay()">▶</button>
       <input type="range" id="musicSeek" class="music-seek" value="0" min="0" max="100" oninput="seekMusic(this.value)">
       <span class="music-time" id="musicTime">0:00</span>
       <div class="music-volume-box">
         <button class="music-vol-btn" id="musicVolBtn" onclick="toggleMuteMusic()" title="Mute/Unmute">🔊</button>
-        <input type="range" id="musicVolume" class="music-vol-slider" value="50" min="0" max="100" oninput="setMusicVolume(this.value)" title="Volume">
+        <input type="range" id="musicVolume" class="music-vol-slider" value="50" min="0" max="100"
+          oninput="setMusicVolume(this.value)" title="Volume">
       </div>
     </div>
   </div>
@@ -248,7 +301,7 @@
       <div class="modal-close-btn" onclick="closeSubmitDuelModal()">✕</div>
       <h2 class="modal-title">⚔️ SUBMIT DUEL RESULT</h2>
       <p class="modal-subtitle">Logged in as Whitelisted Staff Admin</p>
-      
+
       <div class="duel-form-group">
         <label>Player 1 (MultiCraft Username)</label>
         <input type="text" id="sdP1" class="form-input" placeholder="e.g. Game1K" required>
@@ -292,7 +345,8 @@
 
       <div class="duel-form-group">
         <label>Outcome / Title</label>
-        <input type="text" id="sdOutcome" class="form-input" placeholder="e.g. Promoted, Rank Match, Tier Test" value="Rank Match">
+        <input type="text" id="sdOutcome" class="form-input" placeholder="e.g. Promoted, Rank Match, Tier Test"
+          value="Rank Match">
       </div>
 
       <div class="duel-form-group">
@@ -312,7 +366,8 @@
         </select>
       </div>
 
-      <button onclick="submitDuelFromSite()" class="auth-btn" style="margin-top:15px;width:100%;">SUBMIT & UPDATE TIER</button>
+      <button onclick="submitDuelFromSite()" class="auth-btn" style="margin-top:15px;width:100%;">SUBMIT & UPDATE
+        TIER</button>
     </div>
   </div>
 
@@ -333,10 +388,35 @@
         <input type="text" id="epBannerUrl" class="form-input" placeholder="https://example.com/banner.jpg">
       </div>
 
+      <div class="duel-form-group">
+        <label>Profile Display Emote / Badge</label>
+        <div class="emote-picker-grid" id="epEmotePicker">
+          <span class="emote-option" onclick="selectProfileEmote('👑')">👑</span>
+          <span class="emote-option" onclick="selectProfileEmote('⚔️')">⚔️</span>
+          <span class="emote-option" onclick="selectProfileEmote('🔥')">🔥</span>
+          <span class="emote-option" onclick="selectProfileEmote('⚡')">⚡</span>
+          <span class="emote-option" onclick="selectProfileEmote('💀')">💀</span>
+          <span class="emote-option" onclick="selectProfileEmote('🏆')">🏆</span>
+          <span class="emote-option" onclick="selectProfileEmote('💎')">💎</span>
+          <span class="emote-option" onclick="selectProfileEmote('🐉')">🐉</span>
+          <span class="emote-option" onclick="selectProfileEmote('🛡️')">🛡️</span>
+          <span class="emote-option" onclick="selectProfileEmote('🎯')">🎯</span>
+          <span class="emote-option" onclick="selectProfileEmote('🎮')">🎮</span>
+          <span class="emote-option" onclick="selectProfileEmote('🌌')">🌌</span>
+          <span class="emote-option" onclick="selectProfileEmote('🐺')">🐺</span>
+          <span class="emote-option" onclick="selectProfileEmote('🚀')">🚀</span>
+          <span class="emote-option" onclick="selectProfileEmote('✨')">✨</span>
+          <span class="emote-option" onclick="selectProfileEmote('')">🚫 None</span>
+        </div>
+        <input type="text" id="epEmote" class="form-input" placeholder="Or type custom emote / emoji (e.g. 👑 or ⚡)"
+          style="margin-top:6px;">
+      </div>
+
       <div class="duel-form-row">
         <div class="duel-form-group">
           <label>Theme Accent Color</label>
-          <input type="color" id="epColor" class="form-input" value="#00eeff" style="height:42px;padding:4px;cursor:pointer;">
+          <input type="color" id="epColor" class="form-input" value="#00eeff"
+            style="height:42px;padding:4px;cursor:pointer;">
         </div>
         <div class="duel-form-group">
           <label>LFM Status</label>
@@ -357,7 +437,8 @@
         <textarea id="epDesc" class="form-input" rows="3" placeholder="Enter custom bio..."></textarea>
       </div>
 
-      <button onclick="saveProfileCustomization()" class="auth-btn" style="margin-top:10px;width:100%;">SAVE PROFILE CHANGES</button>
+      <button onclick="saveProfileCustomization()" class="auth-btn" style="margin-top:10px;width:100%;">SAVE PROFILE
+        CHANGES</button>
     </div>
   </div>
 
@@ -389,17 +470,54 @@
         </div>
       </div>
 
-      <button onclick="addEmailToWhitelist()" class="auth-btn" style="margin-bottom:14px;width:100%;">+ ADD / UPDATE PERMISSIONS</button>
+      <button onclick="addEmailToWhitelist()" class="auth-btn" style="margin-bottom:14px;width:100%;">+ ADD / UPDATE
+        PERMISSIONS</button>
 
       <div class="duel-form-group">
         <label>Whitelisted Accounts & Roles</label>
-        <div id="whitelistItemsList" style="max-height:220px;overflow-y:auto;background:rgba(13,15,23,0.9);border:1px solid var(--border-glass);border-radius:10px;padding:10px;display:flex;flex-direction:column;gap:8px;"></div>
+        <div id="whitelistItemsList"
+          style="max-height:220px;overflow-y:auto;background:rgba(13,15,23,0.9);border:1px solid var(--border-glass);border-radius:10px;padding:10px;display:flex;flex-direction:column;gap:8px;">
+        </div>
       </div>
+      <div id="whitelistFirestoreNote" style="display:none;margin-top:8px;font-size:0.75rem;color:#fbbf24;line-height:1.4;"></div>
+    </div>
+  </div>
+
+  <!-- PWA Install Banner -->
+  <div id="pwaBanner" class="pwa-install-banner" style="display:none;">
+    <div class="pwa-banner-content">
+      <img src="assets/mtctiers.png" alt="MTCTiers App" class="pwa-banner-icon">
+      <div class="pwa-banner-text">
+        <div class="pwa-banner-title">Install MTCTiers App</div>
+        <div class="pwa-banner-desc">Offline 2FA security codes, instant rankings & fast PWA experience</div>
+      </div>
+      <button class="btn-pwa-install-banner" onclick="promptPwaInstall()">INSTALL</button>
+      <button class="pwa-banner-close" onclick="closePwaBanner()">&times;</button>
+    </div>
+  </div>
+
+  <!-- Mobile Bottom Navigation Bar (PWA & Small Screens) -->
+  <div class="mobile-bottom-nav">
+    <div class="mobile-nav-item active" id="mnav-home" onclick="switchTab('home')">
+      <span class="mobile-nav-icon">🏆</span>
+      <span class="mobile-nav-label">Rankings</span>
+    </div>
+    <div class="mobile-nav-item" id="mnav-rankings" onclick="switchTab('rankings')">
+      <span class="mobile-nav-icon">⚔️</span>
+      <span class="mobile-nav-label">Kits</span>
+    </div>
+    <div class="mobile-nav-item" id="mnav-duels" onclick="switchTab('duels')">
+      <span class="mobile-nav-icon">📜</span>
+      <span class="mobile-nav-label">Duels</span>
+    </div>
+    <div class="mobile-nav-item" id="mnav-2fa" onclick="switchTab('2fa')" style="display:none;">
+      <span class="mobile-nav-icon">🔐</span>
+      <span class="mobile-nav-label">2FA Auth</span>
     </div>
   </div>
 
   <div id="toast" class="toast">Link copied to clipboard!</div>
 
-  <script src="app.js?v=20260808_01"></script>
+  <script src="app.js?v=20260826_2"></script>
 </body>
 </html>

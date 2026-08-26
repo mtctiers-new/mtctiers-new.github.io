@@ -1,3 +1,5 @@
+// MTCTIERS Discord Bot \\
+
 const { Client, GatewayIntentBits, REST, Routes } = require('discord.js');
 const http = require('http');
 const config = require('./config');
@@ -191,10 +193,7 @@ client.on('messageCreate', async message => {
     const parsed = parseManualResultText(message.content);
     if (parsed) {
       await processManualResult(parsed);
-      await message.react('✅').catch(() => {});
-      await message.reply({
-        content: `✅ **Manual Result Recorded!** Updated rankings & duel history for **${parsed.player}** vs **${parsed.opponent}** in **${parsed.kit}** (${parsed.tier || parsed.rawOutcome}). Live on mtctiers.com!`
-      }).catch(() => {});
+      await message.react('🔥').catch(() => {});
     }
   } catch (err) {
     console.error('Error processing manual result message:', err);

@@ -6,16 +6,24 @@
   <script>
     (function() {
       const path = window.location.pathname.toLowerCase();
-      const search = window.location.search;
+      const params = new URLSearchParams(window.location.search);
       if (path.includes('/status')) {
-        window.location.replace('/status.html' + search);
-      } else if (path.includes('/duels')) {
-        const hasQuery = search && search.length > 1;
-        const target = '/index.html?tab=duels' + (hasQuery ? '&' + search.substring(1) : '');
-        window.location.replace(target);
-      } else {
-        window.location.replace('/' + search);
+        const qs = params.toString();
+        window.location.replace('/status.html' + (qs ? '?' + qs : ''));
+        return;
       }
+      if (path.includes('/duel')) {
+        const parts = path.split('/').filter(Boolean);
+        const maybeId = parts.length >= 2 ? parts[parts.length - 1] : '';
+        if (/^[1-9]\d{0,8}$/.test(maybeId) && !params.has('duel')) {
+          params.set('duel', maybeId);
+        }
+        params.set('tab', 'duels');
+        window.location.replace('/index.html?' + params.toString());
+        return;
+      }
+      const qs = window.location.search || '';
+      window.location.replace('/' + qs);
     })();
   </script>
 </head>
