@@ -1,4 +1,4 @@
-const CACHE_NAME = 'mtctiers-pwa-v20260810_161606';
+const CACHE_NAME = 'mtctiers-pwa-v20260826_2';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -36,7 +36,7 @@ self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys().then(keys => {
       return Promise.all(
-        keys.map(key => {
+        keys.filter(key => key !== CACHE_NAME).map(key => {
           console.log('💥 [Service Worker] Destroying old cache key:', key);
           return caches.delete(key);
         })
@@ -70,7 +70,24 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  // Strategy 2: External REST APIs / Firestore -> Network First with Offline Cache Fallback
+  // Do not cache Firestore / Railway API responses (403s and live duel payloads).
+  if (url.hostname.includes('googleapis.com') || url.hostname.includes('railway.app')) {
+    event.respondWith(
+      fetch(req).catch(async () => {
+        if (req.mode === 'navigate') {
+          const offlinePage = await caches.match('/index.html');
+          if (offlinePage) return offlinePage;
+        }
+        return new Response(JSON.stringify({ offline: true, error: "Network offline" }), {
+          status: 503,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      })
+    );
+    return;
+  }
+
+  // Strategy 2: Other requests -> Network First with Offline Cache Fallback
   event.respondWith(
     fetch(req).then(networkRes => {
       if (networkRes && networkRes.status === 200) {
