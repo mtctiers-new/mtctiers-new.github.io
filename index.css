@@ -2147,3 +2147,487 @@ body {
 }
 
 
+
+/* =========================================================
+   DASHBOARD (HOME) — Top Players / Recent Duels /
+   Leaderboards & News / Servers
+   ========================================================= */
+
+.dashboard-wrap {
+  display: none;
+  flex-direction: column;
+  gap: 40px;
+  padding-bottom: 20px;
+}
+
+.dash-section {
+  background: var(--bg-card);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--border-glass);
+  border-radius: 20px;
+  padding: 26px 28px 30px 28px;
+  box-shadow: var(--shadow-md);
+}
+
+.dash-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 18px;
+  flex-wrap: wrap;
+}
+
+.dash-podium-section .dash-section-title,
+.dash-servers-section > .dash-section-title {
+  margin-bottom: 22px;
+}
+
+.dash-section-title {
+  font-family: var(--font-heading);
+  font-weight: 800;
+  font-size: 1.15rem;
+  letter-spacing: 1.5px;
+  color: var(--text-main);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.dash-viewall {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: var(--cyan);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: opacity 0.2s ease;
+}
+
+.dash-viewall:hover { opacity: 0.7; }
+
+.dash-empty {
+  text-align: center;
+  padding: 30px 10px;
+  color: var(--text-dim);
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+}
+
+/* ---- MCPVP-style podium ---- */
+
+.mcpvp-podium {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 18px;
+  padding-top: 10px;
+}
+
+.mcpvp-podium-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 170px;
+  cursor: pointer;
+  transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.mcpvp-podium-item:hover { transform: translateY(-6px); }
+
+.mcpvp-podium-item.place-1 { order: 2; width: 190px; }
+.mcpvp-podium-item.place-2 { order: 1; }
+.mcpvp-podium-item.place-3 { order: 3; }
+
+.mcpvp-podium-avatar-wrap {
+  width: 84px;
+  height: 84px;
+  margin-bottom: 12px;
+  border-radius: 16px;
+  padding: 3px;
+  background: linear-gradient(160deg, rgba(255,255,255,0.12), rgba(255,255,255,0.02));
+}
+
+.place-1 .mcpvp-podium-avatar-wrap {
+  width: 100px;
+  height: 100px;
+  box-shadow: 0 0 26px var(--gold-glow);
+}
+.place-2 .mcpvp-podium-avatar-wrap { box-shadow: 0 0 20px rgba(190, 190, 190, 0.25); }
+.place-3 .mcpvp-podium-avatar-wrap { box-shadow: 0 0 20px rgba(205, 127, 50, 0.25); }
+
+.mcpvp-podium-avatar {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top;
+  image-rendering: pixelated;
+  border-radius: 13px;
+}
+
+.mcpvp-podium-name {
+  font-family: var(--font-heading);
+  font-weight: 800;
+  font-size: 1.05rem;
+  color: var(--text-main);
+  text-align: center;
+  margin-bottom: 4px;
+}
+
+.place-1 .mcpvp-podium-name { font-size: 1.2rem; color: var(--gold); }
+
+.mcpvp-podium-pts {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin-bottom: 14px;
+}
+
+.mcpvp-podium-stand {
+  width: 100%;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 10px;
+  border-radius: 10px 10px 0 0;
+  font-family: var(--font-heading);
+  font-weight: 900;
+}
+
+.mcpvp-podium-stand-rank {
+  font-size: 1.8rem;
+  color: rgba(0, 0, 0, 0.55);
+}
+
+.place-1 .mcpvp-podium-stand {
+  height: 120px;
+  background: linear-gradient(180deg, #ffe259 0%, #ffd700 45%, #b8860b 100%);
+  box-shadow: 0 0 30px var(--gold-glow);
+}
+
+.place-2 .mcpvp-podium-stand {
+  height: 88px;
+  background: linear-gradient(180deg, #eaeaea 0%, #b0b0b0 45%, #7a7a7a 100%);
+  box-shadow: 0 0 20px rgba(190, 190, 190, 0.25);
+}
+
+.place-3 .mcpvp-podium-stand {
+  height: 66px;
+  background: linear-gradient(180deg, #e3a866 0%, #cd7f32 45%, #8a541f 100%);
+  box-shadow: 0 0 20px rgba(205, 127, 50, 0.25);
+}
+
+/* ---- Recent duels (dashboard) ---- */
+
+.dash-duels-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 12px;
+}
+
+.dash-duel-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 6px;
+  background: rgba(13, 15, 23, 0.6);
+  border: 1px solid var(--border-glass);
+  border-radius: 14px;
+  padding: 16px 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.dash-duel-card:hover {
+  border-color: var(--border-glass-hover);
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-sm);
+}
+
+.dash-duel-score {
+  font-family: var(--font-heading);
+  font-weight: 900;
+  font-size: 1.3rem;
+  letter-spacing: 1px;
+}
+
+.dash-duel-score.won { color: var(--emerald); }
+.dash-duel-score.lost { color: var(--crimson); }
+
+.dash-duel-names {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-heading);
+  font-weight: 700;
+  font-size: 0.85rem;
+  color: var(--text-main);
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.dash-duel-p1:hover, .dash-duel-p2:hover { color: var(--cyan); }
+
+.dash-duel-vs {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  color: var(--text-dim);
+}
+
+.dash-duel-desc {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  line-height: 1.3;
+}
+
+.dash-duel-date {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  color: var(--text-dim);
+}
+
+/* ---- Leaderboards + News split ---- */
+
+.dash-split {
+  display: grid;
+  grid-template-columns: 1fr 1fr 0.7fr;
+  gap: 24px;
+}
+
+.dash-lb-tabs {
+  display: flex;
+  gap: 6px;
+}
+
+.dash-lb-tab {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-glass);
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 1px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.dash-lb-tab:hover { color: var(--text-main); }
+
+.dash-lb-tab.active {
+  background: rgba(0, 238, 255, 0.15);
+  border-color: var(--cyan);
+  color: var(--cyan);
+}
+
+.dash-lb-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 16px;
+}
+
+.dash-lb-row {
+  display: grid;
+  grid-template-columns: 42px 1fr auto;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 10px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.dash-lb-row:hover { background: rgba(255, 255, 255, 0.04); }
+
+.dash-lb-rank {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 0.8rem;
+  color: var(--text-dim);
+}
+
+.dash-lb-name {
+  font-family: var(--font-heading);
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: var(--text-main);
+}
+
+.dash-lb-pts {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 0.75rem;
+  color: var(--gold);
+}
+
+.dash-status-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 6px;
+  text-decoration: none;
+  cursor: pointer;
+  transition: all 0.25s ease;
+}
+
+.dash-status-card:hover {
+  border-color: rgba(16, 185, 129, 0.4);
+  transform: translateY(-3px);
+  box-shadow: 0 0 25px rgba(16, 185, 129, 0.15);
+}
+
+.dash-status-icon {
+  font-size: 1.6rem;
+  margin-bottom: 4px;
+}
+
+.dash-status-title {
+  font-family: var(--font-heading);
+  font-weight: 800;
+  font-size: 1rem;
+  letter-spacing: 1.5px;
+  color: var(--emerald);
+}
+
+.dash-status-text {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+.dash-news-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: 360px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.dash-news-item {
+  background: rgba(13, 15, 23, 0.6);
+  border: 1px solid var(--border-glass);
+  border-radius: 12px;
+  padding: 12px 14px;
+}
+
+.dash-news-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+.dash-news-title {
+  font-family: var(--font-heading);
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: var(--cyan);
+}
+
+.dash-news-date {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+.dash-news-body {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+.dash-news-changes {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.dash-news-changes li {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+
+.dash-news-prefix {
+  flex: none;
+  font-weight: 800;
+  width: 14px;
+  text-align: center;
+}
+
+.dash-news-changes li.added { color: var(--text-main); }
+.dash-news-changes li.added .dash-news-prefix { color: var(--emerald); }
+
+.dash-news-changes li.removed { color: var(--text-main); }
+.dash-news-changes li.removed .dash-news-prefix { color: var(--crimson); }
+
+.dash-news-changes li.changed { color: var(--text-main); }
+.dash-news-changes li.changed .dash-news-prefix { color: var(--gold); }
+
+.dash-news-changes li.note .dash-news-prefix { color: var(--text-dim); }
+
+.dash-news-author {
+  margin-top: 6px;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: var(--text-dim);
+}
+
+/* ---- Servers: under maintenance ---- */
+
+.dash-maintenance-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 40px 20px;
+  border: 1px dashed var(--border-glass-hover);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.dash-maintenance-icon {
+  font-size: 2.2rem;
+  margin-bottom: 12px;
+}
+
+.dash-maintenance-title {
+  font-family: var(--font-heading);
+  font-weight: 800;
+  font-size: 1.1rem;
+  color: var(--purple);
+  letter-spacing: 1px;
+  margin-bottom: 8px;
+}
+
+.dash-maintenance-text {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  max-width: 420px;
+  line-height: 1.5;
+}
+
+@media (max-width: 860px) {
+  .dash-split { grid-template-columns: 1fr; }
+  .mcpvp-podium { flex-wrap: wrap; }
+  .mcpvp-podium-item { width: 120px; }
+  .mcpvp-podium-item.place-1 { width: 130px; }
+}

@@ -256,7 +256,7 @@ function getPlayerTitle(pts, rank) {
 }
 
 let DATA = { Overall: {}, Players: [] };
-let CURRENT_TAB = 'home';
+let CURRENT_TAB = 'dashboard';
 let CURRENT_KIT = 'Overall';
 let CURRENT_PLAYER = null;
 
@@ -451,13 +451,20 @@ function switchTab(tab) {
   const kitBar = document.getElementById('kitBar');
   const filterBar = document.getElementById('filterBar');
   const podiumWrap = document.getElementById('podiumWrap');
+  const dashboardWrap = document.getElementById('dashboardWrap');
 
-  if (tab === 'home') {
+  if (tab === 'dashboard') {
+    if (kitBar) kitBar.style.display = 'none';
+    if (filterBar) filterBar.style.display = 'none';
+    if (podiumWrap) { podiumWrap.style.display = 'none'; podiumWrap.innerHTML = ''; }
+    if (dashboardWrap) dashboardWrap.style.display = 'flex';
+  } else if (tab === 'home') {
     CURRENT_KIT = 'Overall';
     updateKitBarActive('Overall');
     if (kitBar) kitBar.style.display = 'flex';
     if (filterBar) filterBar.style.display = 'flex';
     if (podiumWrap) podiumWrap.style.display = 'flex';
+    if (dashboardWrap) { dashboardWrap.style.display = 'none'; dashboardWrap.innerHTML = ''; }
   } else if (tab === 'rankings') {
     if (CURRENT_KIT === 'Overall') {
       CURRENT_KIT = 'Emerald';
@@ -466,10 +473,12 @@ function switchTab(tab) {
     if (kitBar) kitBar.style.display = 'flex';
     if (filterBar) filterBar.style.display = 'flex';
     if (podiumWrap) { podiumWrap.style.display = 'none'; podiumWrap.innerHTML = ''; }
+    if (dashboardWrap) { dashboardWrap.style.display = 'none'; dashboardWrap.innerHTML = ''; }
   } else {
     if (kitBar) kitBar.style.display = 'none';
     if (filterBar) filterBar.style.display = 'none';
     if (podiumWrap) { podiumWrap.style.display = 'none'; podiumWrap.innerHTML = ''; }
+    if (dashboardWrap) { dashboardWrap.style.display = 'none'; dashboardWrap.innerHTML = ''; }
   }
 
   renderCurrentTab();
@@ -485,7 +494,9 @@ function renderCurrentTab() {
   const displayList = document.getElementById('displayList');
   const podiumWrap = document.getElementById('podiumWrap');
 
-  if (CURRENT_TAB === 'home' || CURRENT_TAB === 'rankings') {
+  if (CURRENT_TAB === 'dashboard') {
+    renderDashboardView();
+  } else if (CURRENT_TAB === 'home' || CURRENT_TAB === 'rankings') {
     if (CURRENT_KIT === 'Overall') {
       if (podiumWrap) podiumWrap.style.display = 'flex';
       renderOverallLeaderboard();
@@ -2153,4 +2164,286 @@ function getServerReqRulesHtml() {
   });
   html += `</div>`;
   return html;
+}
+
+/* =========================================================
+   DASHBOARD (HOME) — Top Players / Recent Duels /
+   Leaderboards & News / Servers
+   ========================================================= */
+
+let DASH_LB_VIEW = 'overall';
+
+function renderDashboardView() {
+  const wrap = document.getElementById('dashboardWrap');
+  if (!wrap) return;
+  wrap.style.display = 'flex';
+
+  wrap.innerHTML = `
+    <section class="dash-section dash-podium-section">
+      <div class="dash-section-title">🏆 TOP PLAYERS</div>
+      <div id="dashPodium" class="mcpvp-podium">
+        <div class="dash-empty">Loading top players...</div>
+      </div>
+    </section>
+
+    <section class="dash-section dash-duels-section">
+      <div class="dash-section-header">
+        <div class="dash-section-title">⚔️ RECENT DUELS</div>
+        <span class="dash-viewall" onclick="switchTab('duels')">VIEW ALL ▶</span>
+      </div>
+      <div id="dashDuels" class="dash-duels-list">
+        <div class="dash-empty">Loading recent duels...</div>
+      </div>
+    </section>
+
+    <section class="dash-split">
+      <div class="dash-section dash-leaderboard-section">
+        <div class="dash-section-header">
+          <div class="dash-section-title">📊 LEADERBOARDS</div>
+          <div class="dash-lb-tabs" id="dashLbTabs">
+            <button type="button" class="dash-lb-tab active" data-view="overall" onclick="switchTab('home')">OVERALL</button>
+          </div>
+        </div>
+        <div id="dashLeaderboardList" class="dash-lb-list">
+          <div class="dash-empty">Loading leaderboard...</div>
+        </div>
+      </div>
+
+      <div class="dash-section dash-news-section">
+        <div class="dash-section-header">
+          <div class="dash-section-title">📰 NEWS &amp; CHANGELOG</div>
+        </div>
+        <div id="dashNewsList" class="dash-news-list">
+          <div class="dash-empty">Loading changelog...</div>
+        </div>
+      </div>
+
+      <a href="status.html" class="dash-section dash-status-card">
+        <div class="dash-status-icon">🟢</div>
+        <div class="dash-status-title">STATUS</div>
+        <div class="dash-status-text">Site &amp; server uptime</div>
+      </a>
+    </section>
+
+    <section class="dash-section dash-servers-section">
+      <div class="dash-section-title">🖥️ OFFICIAL SERVERS</div>
+      <div class="dash-maintenance-card">
+        <div class="dash-maintenance-icon">🛠️</div>
+        <div class="dash-maintenance-title">Under Maintenance</div>
+        <div class="dash-maintenance-text">Live server listings are temporarily unavailable while the server data API is being rebuilt. Check back soon.</div>
+      </div>
+    </section>
+  `;
+
+  renderDashboardPodium();
+  renderDashboardDuels();
+  renderDashboardLeaderboardList();
+  fetchAndRenderChangelog();
+}
+
+function renderDashboardPodium() {
+  const el = document.getElementById('dashPodium');
+  if (!el) return;
+
+  const sorted = Object.entries(DATA.Overall || {})
+    .filter(([name]) => filterPlayerVisible(name))
+    .sort((a, b) => b[1] - a[1]);
+
+  const top3 = sorted.slice(0, 3);
+  if (!top3.length) {
+    el.innerHTML = '<div class="dash-empty">No ranked players yet</div>';
+    return;
+  }
+
+  // Visual order (left-to-right): 2nd, 1st, 3rd — like a real podium
+  const displayOrder = [2, 1, 3];
+  let html = '';
+  displayOrder.forEach(rank => {
+    const entry = top3[rank - 1];
+    if (!entry) return;
+    const [name, pts] = entry;
+    const skinPath = getPlayerSkinSrc(name);
+
+    html += `
+      <div class="mcpvp-podium-item place-${rank}" onclick="openProfile('${name}')">
+        <div class="mcpvp-podium-avatar-wrap">
+          <img src="${skinPath}" alt="${name}" class="mcpvp-podium-avatar" onerror="this.src='assets/mtctiers_default_skin.png'">
+        </div>
+        <div class="mcpvp-podium-name">${name}</div>
+        <div class="mcpvp-podium-pts">${pts} PTS</div>
+        <div class="mcpvp-podium-stand">
+          <span class="mcpvp-podium-stand-rank">${rank}</span>
+        </div>
+      </div>
+    `;
+  });
+  el.innerHTML = html;
+}
+
+async function renderDashboardDuels() {
+  const el = document.getElementById('dashDuels');
+  if (!el) return;
+
+  try {
+    const duels = await fetchDuelsFromFirestore();
+    if (!duels || !duels.length) {
+      el.innerHTML = '<div class="dash-empty">No recent duels</div>';
+      return;
+    }
+
+    const recent = duels.slice(0, 6);
+    let html = '';
+    recent.forEach((d, i) => {
+      const duelId = String(d.id || d.message_id || `dash_${i}`);
+      DUELS_REGISTRY.set(duelId, d);
+
+      const perspective = d.player1;
+      const info = duelPerspective(d, perspective);
+      const date = new Date(d.timestamp || d.created_at * 1000 || Date.now()).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      const desc = duelDescLine(d, perspective);
+
+      html += `
+        <div class="dash-duel-card" onclick="openDuelPopupById('${duelId}', '${perspective}')">
+          <div class="dash-duel-score ${info.won ? 'won' : 'lost'}">${d.player1_score}-${d.player2_score}</div>
+          <div class="dash-duel-names">
+            <span class="dash-duel-p1" onclick="event.stopPropagation();openProfile('${d.player1}')">${d.player1}</span>
+            <span class="dash-duel-vs">vs</span>
+            <span class="dash-duel-p2" onclick="event.stopPropagation();openProfile('${d.player2}')">${d.player2}</span>
+          </div>
+          <div class="dash-duel-desc">${desc}</div>
+          <div class="dash-duel-date">${date}</div>
+        </div>
+      `;
+    });
+    el.innerHTML = html;
+  } catch (e) {
+    el.innerHTML = '<div class="dash-empty">Could not load duels</div>';
+  }
+}
+
+function renderDashboardLeaderboardList() {
+  const el = document.getElementById('dashLeaderboardList');
+  if (!el) return;
+
+  const entries = Object.entries(DATA.Overall || {})
+    .filter(([name]) => filterPlayerVisible(name))
+    .sort((a, b) => b[1] - a[1]);
+
+  const top = entries.slice(0, 3);
+  if (!top.length) {
+    el.innerHTML = '<div class="dash-empty">No data yet</div>';
+    return;
+  }
+
+  let html = '';
+  top.forEach(([name, pts], idx) => {
+    html += `
+      <div class="dash-lb-row" onclick="openProfile('${name}')">
+        <span class="dash-lb-rank">#${idx + 1}</span>
+        <span class="dash-lb-name">${name}</span>
+        <span class="dash-lb-pts">${pts} PTS</span>
+      </div>
+    `;
+  });
+  el.innerHTML = html;
+}
+
+const CHANGELOG_SOURCE_URL = "https://mtctiers-discord-bot-production.up.railway.app/changelog"; // e.g. "https://mtctiers-bot.up.railway.app/changelog"
+
+function parseChangelogMessage(content) {
+  if (!content || typeof content !== 'string') return null;
+
+  const lines = content.replace(/\r\n/g, '\n').split('\n').map(l => l.trim());
+  let title = '';
+  const changes = [];
+
+  for (const line of lines) {
+    if (!line) continue;
+
+    if (!title) {
+      const m = line.match(/^\*\*(.+?)\*\*$/);
+      title = m ? m[1].trim() : line.replace(/\*/g, '').trim();
+      continue;
+    }
+
+    const addM = line.match(/^\[\+\]\s*(.+)/);
+    const remM = line.match(/^\[-\]\s*(.+)/);
+    const chgM = line.match(/^\[~\]\s*(.+)/);
+
+    if (addM) changes.push({ type: 'added', text: addM[1].trim() });
+    else if (remM) changes.push({ type: 'removed', text: remM[1].trim() });
+    else if (chgM) changes.push({ type: 'changed', text: chgM[1].trim() });
+    else changes.push({ type: 'note', text: line });
+  }
+
+  if (!title && !changes.length) return null;
+  return { title: title || 'Update', changes };
+}
+
+async function fetchAndRenderChangelog() {
+  const el = document.getElementById('dashNewsList');
+  if (!el) return;
+
+  if (!CHANGELOG_SOURCE_URL || CHANGELOG_SOURCE_URL.startsWith('PASTE_')) {
+    el.innerHTML = '<div class="dash-empty">Changelog not connected yet</div>';
+    return;
+  }
+
+  try {
+    const res = await fetch(CHANGELOG_SOURCE_URL);
+    if (!res.ok) throw new Error('changelog fetch failed');
+    const messages = await res.json();
+
+    if (!Array.isArray(messages) || !messages.length) {
+      el.innerHTML = '<div class="dash-empty">No changelogs currently.</div>';
+      return;
+    }
+
+    const parsed = messages
+      .map(m => {
+        const entry = parseChangelogMessage(m.content);
+        if (!entry) return null;
+        entry.timestamp = m.timestamp || m.created_at || null;
+        entry.author = (m.author && typeof m.author === 'object') ? (m.author.username || m.author.name || '') : (m.author || '');
+        return entry;
+      })
+      .filter(Boolean)
+      .sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0));
+
+    if (!parsed.length) {
+      el.innerHTML = '<div class="dash-empty">No changelog entries yet — check back soon.</div>';
+      return;
+    }
+
+    let html = '';
+    parsed.slice(0, 50).forEach(entry => {
+      const date = entry.timestamp
+        ? new Date(entry.timestamp).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+        : '';
+      const title = escapeHTML(entry.title);
+      const author = escapeHTML(entry.author || '');
+
+      let changesHtml = '';
+      entry.changes.forEach(c => {
+        const cls = c.type === 'added' ? 'added' : c.type === 'removed' ? 'removed' : c.type === 'changed' ? 'changed' : 'note';
+        const prefix = c.type === 'added' ? '+' : c.type === 'removed' ? '−' : c.type === 'changed' ? '~' : '•';
+        changesHtml += `<li class="${cls}"><span class="dash-news-prefix">${prefix}</span>${escapeHTML(c.text)}</li>`;
+      });
+
+      html += `
+        <div class="dash-news-item">
+          <div class="dash-news-top">
+            <span class="dash-news-title">${title}</span>
+            <span class="dash-news-date">${date}</span>
+          </div>
+          <ul class="dash-news-changes">${changesHtml}</ul>
+          ${author ? `<div class="dash-news-author">— ${author}</div>` : ''}
+        </div>
+      `;
+    });
+    el.innerHTML = html;
+  } catch (e) {
+    console.warn("Changelog fetch note:", e.message);
+    el.innerHTML = '<div class="dash-empty">Could not load changelog.</div>';
+  }
 }

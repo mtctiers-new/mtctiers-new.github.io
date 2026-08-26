@@ -38,13 +38,14 @@
   </div>
 
   <nav class="navbar">
-    <div class="nav-brand" onclick="switchTab('home')">
+    <div class="nav-brand" onclick="switchTab('dashboard')">
       <img src="assets/mtctiers.png" alt="MTC Tiers Logo" class="nav-logo" onerror="this.src='assets/mtctiers_default_skin.png'">
       <span class="nav-title">MTC TIERS</span>
     </div>
 
     <div class="nav-links">
-      <div class="nav-link active" id="nav-home" onclick="switchTab('home')">OVERALL</div>
+      <div class="nav-link active" id="nav-dashboard" onclick="switchTab('dashboard')">HOME</div>
+      <div class="nav-link" id="nav-home" onclick="switchTab('home')">OVERALL</div>
       <div class="nav-link" id="nav-rankings" onclick="switchTab('rankings')">KITS</div>
       <div class="nav-link" id="nav-rules" onclick="switchTab('rules')">RULES</div>
       <div class="nav-link" id="nav-hof" onclick="switchTab('hof')">HALL OF FAME</div>
@@ -81,7 +82,9 @@
 
   <main class="main-container">
 
-    <div class="kit-bar" id="kitBar">
+    <div id="dashboardWrap" class="dashboard-wrap"></div>
+
+    <div class="kit-bar" id="kitBar" style="display:none;">
       <div class="kit-btn active" data-kit="Overall" onclick="selectKit('Overall')">
         <span>OVERALL</span>
       </div>
@@ -119,7 +122,7 @@
       </div>
     </div>
 
-    <div class="filter-bar" id="filterBar">
+    <div class="filter-bar" id="filterBar" style="display:none;">
       <select id="filterRegion" class="filter-select" onchange="applyFilters()">
         <option value="">All Regions</option>
         <option value="NA">North America (NA)</option>
@@ -147,7 +150,7 @@
       <button class="btn-reset" onclick="resetFilters()">Reset Filters</button>
     </div>
 
-    <div id="podiumWrap" class="podium-wrap"></div>
+    <div id="podiumWrap" class="podium-wrap" style="display:none;"></div>
 
     <div id="displayList"></div>
 
