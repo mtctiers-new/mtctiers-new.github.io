@@ -1,4 +1,4 @@
-const CACHE_NAME = 'mtctiers-pwa-v20260826_1';
+const CACHE_NAME = 'mtctiers-pwa-v20260826_2';
 const STATIC_ASSETS = [
   '/',
   '/index.html',

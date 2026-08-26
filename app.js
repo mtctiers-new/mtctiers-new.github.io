@@ -1147,14 +1147,70 @@ function parseFirestoreMapVal(item) {
   return Object.values(item)[0];
 }
 
+function toPositiveInt(val) {
+  if (typeof val === 'number') {
+    return Number.isInteger(val) && val > 0 && Number.isSafeInteger(val) ? val : null;
+  }
+  if (typeof val === 'string') {
+    const s = val.trim();
+    if (!/^[1-9]\d{0,8}$/.test(s)) return null;
+    return parseInt(s, 10);
+  }
+  return null;
+}
+
+function getDuelIntegerId(d) {
+  if (!d || typeof d !== 'object') return null;
+  const fromNumber = toPositiveInt(d.duel_number);
+  if (fromNumber) return fromNumber;
+  if (d.message_id && d.duel_number == null) return null;
+  return toPositiveInt(d.id);
+}
+
+let MAX_DUEL_INTEGER_ID = 364;
+
+function noteDuelIntegerId(n) {
+  if (n && n > MAX_DUEL_INTEGER_ID) MAX_DUEL_INTEGER_ID = n;
+}
+
+async function allocateNextDuelIntegerId() {
+  if (db) {
+    try {
+      const meta = await db.collection('duels').doc('all_duels').get();
+      const fromMeta = meta.exists ? toPositiveInt(meta.data().total_count) : null;
+      if (fromMeta) noteDuelIntegerId(fromMeta);
+    } catch (e) {
+      console.warn('all_duels total_count read note:', e.message);
+    }
+  }
+  for (const v of DUELS_REGISTRY.values()) {
+    noteDuelIntegerId(getDuelIntegerId(v));
+  }
+  try {
+    const cached = JSON.parse(localStorage.getItem('MTCTIERS_DUELS_CACHE_V2') || 'null');
+    if (cached && Array.isArray(cached.duels)) {
+      cached.duels.forEach(d => noteDuelIntegerId(getDuelIntegerId(d)));
+    }
+  } catch (e) {}
+  return MAX_DUEL_INTEGER_ID + 1;
+}
+
 function dedupeAndSortDuels(duels) {
   const map = new Map();
   duels.forEach(d => {
-    const key = d.id || d.message_id || `${d.player1}_${d.player2}_${d.timestamp || d.created_at}`;
-    if (!map.has(key)) map.set(key, d);
+    const id = getDuelIntegerId(d);
+    if (!id) return;
+    noteDuelIntegerId(id);
+    const existing = map.get(id);
+    if (!existing) {
+      map.set(id, d);
+      return;
+    }
+    if (toPositiveInt(existing.duel_number) == null && toPositiveInt(d.duel_number) != null) {
+      map.set(id, d);
+    }
   });
-  const list = Array.from(map.values());
-  return list.sort((a, b) => new Date(b.timestamp || b.created_at * 1000 || 0) - new Date(a.timestamp || a.created_at * 1000 || 0));
+  return Array.from(map.values()).sort((a, b) => getDuelIntegerId(b) - getDuelIntegerId(a));
 }
 
 function collectDuelsFromPayload(payload, into) {
@@ -1266,6 +1322,8 @@ async function renderDuelsView(playerFilter) {
       }
     }
 
+    duels = (duels || []).filter(d => getDuelIntegerId(d));
+
     if (!duels.length) {
       displayList.innerHTML = `<div style="text-align:center;padding:40px;color:var(--text-muted);font-family:var(--font-heading);">No duels found</div>`;
       return;
@@ -1280,10 +1338,10 @@ async function renderDuelsView(playerFilter) {
     `;
 
     DUELS_REGISTRY.clear();
-    duels.forEach((d, i) => {
-      const duelNum = d.duel_number || d.id || (duels.length - i);
-      const duelId = String(d.id || d.duel_number || d.message_id || `d_${i}`);
-      DUELS_REGISTRY.set(duelId, d);
+    duels.forEach((d) => {
+      const duelNum = getDuelIntegerId(d);
+      if (!duelNum) return;
+      DUELS_REGISTRY.set(duelNum, d);
       DUELS_REGISTRY.set(String(duelNum), d);
 
       const perspective = playerFilter || d.player1;
@@ -1292,7 +1350,7 @@ async function renderDuelsView(playerFilter) {
       const desc = duelDescLine(d, perspective);
 
       html += `
-        <div class="duel-row ${info.won ? 'won' : 'lost'}" onclick="openDuelPopupById('${duelId}', '${perspective}')">
+        <div class="duel-row ${info.won ? 'won' : 'lost'}" onclick="openDuelPopupById('${duelNum}', '${perspective}')">
           <div class="duel-row-top">
             <div class="duel-names">
               <span class="duel-num-tag">#${duelNum}</span>
@@ -1350,8 +1408,11 @@ async function renderProfileDuels(playerName) {
     if (!bioCard || !duels || !duels.length) return;
 
     const d = duels[0];
-    const duelId = String(d.id || d.message_id || `latest_${playerName}`);
-    DUELS_REGISTRY.set(duelId, d);
+    const duelId = getDuelIntegerId(d);
+    if (duelId) {
+      DUELS_REGISTRY.set(duelId, d);
+      DUELS_REGISTRY.set(String(duelId), d);
+    }
 
     const info = duelPerspective(d, playerName);
     const date = new Date(d.timestamp || d.created_at * 1000 || Date.now()).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
@@ -1364,7 +1425,7 @@ async function renderProfileDuels(playerName) {
         <span class="profile-duel-label-text">LATEST DUEL</span>
         <span class="profile-duel-viewall" onclick="closeProfileModal();switchTab('duels');renderDuelsView('${playerName}')">VIEW ALL ▶</span>
       </div>
-      <div class="profile-duel-card" onclick="openDuelPopupById('${duelId}', '${playerName}')">
+      <div class="profile-duel-card" onclick="${duelId ? `openDuelPopupById('${duelId}', '${playerName}')` : ''}">
         <div class="profile-duel-top">
           <div class="profile-duel-names">${playerName} <span>vs</span> ${info.opponent}</div>
           <div class="profile-duel-score-text" style="color: ${info.won ? 'var(--emerald)' : 'var(--crimson)'};">${info.myScore}-${info.oppScore}</div>
@@ -1539,14 +1600,19 @@ function closeProfileModal() {
 const DUELS_REGISTRY = new Map();
 
 function copyDuelLink(duelId, playerName) {
+  const n = toPositiveInt(duelId);
+  if (!n) {
+    showToast('⚠️ This duel has no integer id to share.');
+    return;
+  }
   const baseUrl = siteShareBase();
-  let shareUrl = `${baseUrl}?tab=duels&duel=${encodeURIComponent(duelId)}`;
+  let shareUrl = `${baseUrl}?tab=duels&duel=${n}`;
   if (playerName) {
     shareUrl += `&player=${encodeURIComponent(playerName)}`;
   }
   if (navigator.clipboard && navigator.clipboard.writeText) {
     navigator.clipboard.writeText(shareUrl).then(() => {
-      showToast(`🔗 Copied direct link for Duel #${duelId}!`);
+      showToast(`🔗 Copied direct link for Duel #${n}!`);
     }).catch(() => {
       prompt("Copy direct duel link:", shareUrl);
     });
@@ -1556,11 +1622,15 @@ function copyDuelLink(duelId, playerName) {
 }
 
 function openDuelPopupById(duelId, perspective) {
-  const dStr = String(duelId).trim();
-  let duel = DUELS_REGISTRY.get(dStr);
+  const n = toPositiveInt(duelId);
+  if (!n) {
+    showToast(`⚠️ Duel #${duelId} is not a valid integer id.`);
+    return;
+  }
+  let duel = DUELS_REGISTRY.get(n) || DUELS_REGISTRY.get(String(n));
   if (!duel) {
-    for (const [k, v] of DUELS_REGISTRY.entries()) {
-      if (String(v.duel_number) === dStr || String(v.id) === dStr || String(v.message_id) === dStr || String(v.timestamp) === dStr) {
+    for (const v of DUELS_REGISTRY.values()) {
+      if (getDuelIntegerId(v) === n) {
         duel = v;
         break;
       }
@@ -1569,7 +1639,7 @@ function openDuelPopupById(duelId, perspective) {
   if (duel) {
     openDuelPopup(duel, perspective);
   } else {
-    showToast(`⚠️ Duel #${duelId} not found in current cache.`);
+    showToast(`⚠️ Duel #${n} not found in current cache.`);
   }
 }
 
@@ -1577,7 +1647,7 @@ function openDuelPopup(duel, perspective) {
   const p = perspective || duel.player1;
   const info = duelPerspective(duel, p);
   const dateStr = new Date(duel.timestamp || duel.created_at * 1000 || Date.now()).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' });
-  const duelNum = duel.duel_number || duel.id || duel.message_id || 'N/A';
+  const duelNum = getDuelIntegerId(duel);
 
   let modal = document.getElementById('duelPopupModalOverlay');
   if (!modal) {
@@ -1592,8 +1662,8 @@ function openDuelPopup(duel, perspective) {
     <div class="modal-card duel-popup-card" style="max-width:480px;border-color:var(--cyan);box-shadow:0 0 35px rgba(0,238,255,0.35);background:rgba(10,20,35,0.95);backdrop-filter:blur(16px);border-radius:20px;padding:24px;position:relative;">
       <button class="modal-close-btn" style="position:absolute;top:16px;right:16px;background:none;border:none;color:#aaa;font-size:1.5rem;cursor:pointer;" onclick="closeDuelPopup()">&times;</button>
       <div style="font-family:var(--font-heading);font-weight:900;font-size:1.3rem;color:var(--cyan);margin-bottom:4px;display:flex;align-items:center;justify-content:space-between;">
-        <span>⚔️ DUEL #${duelNum}</span>
-        <span style="font-size:0.8rem;color:var(--text-muted);font-weight:600;">ID: #${duelNum}</span>
+        <span>⚔️ DUEL #${duelNum ?? 'N/A'}</span>
+        <span style="font-size:0.8rem;color:var(--text-muted);font-weight:600;">ID: #${duelNum ?? 'N/A'}</span>
       </div>
       <div style="font-family:var(--font-heading);font-size:0.85rem;color:var(--text-muted);margin-bottom:16px;">${dateStr}</div>
 
@@ -1636,7 +1706,11 @@ function openDuelPopup(duel, perspective) {
   `;
 
   if (window.history && window.history.replaceState) {
-    window.history.replaceState(null, '', `?tab=duels&player=${encodeURIComponent(p)}&duel=${encodeURIComponent(duelNum)}`);
+    const params = new URLSearchParams();
+    params.set('tab', 'duels');
+    if (duelNum) params.set('duel', String(duelNum));
+    if (p) params.set('player', p);
+    window.history.replaceState(null, '', `?${params.toString()}`);
   }
 
   modal.classList.add('active');
@@ -1666,15 +1740,15 @@ async function handleUrlParamsOnLoad() {
     const params = new URLSearchParams(search);
     if (params.has('player')) targetPlayer = params.get('player');
     else if (params.has('p')) targetPlayer = params.get('p');
-    if (params.has('duel')) targetDuelId = params.get('duel');
-    else if (params.has('d')) targetDuelId = params.get('d');
+    if (params.has('duel')) targetDuelId = toPositiveInt(params.get('duel'));
+    else if (params.has('d')) targetDuelId = toPositiveInt(params.get('d'));
     if (params.has('tab')) targetTab = params.get('tab');
   }
 
   if (hash) {
     const rawHash = hash.substring(1).trim();
     if (!targetPlayer && rawHash.startsWith('player=')) targetPlayer = rawHash.replace('player=', '');
-    else if (!targetDuelId && rawHash.startsWith('duel=')) targetDuelId = rawHash.replace('duel=', '');
+    else if (!targetDuelId && rawHash.startsWith('duel=')) targetDuelId = toPositiveInt(rawHash.replace('duel=', ''));
     else if (!targetPlayer && rawHash && !rawHash.includes('=')) targetPlayer = rawHash;
   }
 
@@ -1876,9 +1950,10 @@ async function submitDuelFromSite() {
 
   const dateStr = new Date().toISOString().split('T')[0];
   const timestamp = Date.now();
+  const duelNumber = await allocateNextDuelIntegerId();
 
-  const recordP1 = { timestamp, date: dateStr, kit, outcome, winner, player1: p1, player2: p2, player1_score: s1, player2_score: s2, result: winner.toLowerCase() === p1.toLowerCase() ? 'Won' : 'Lost' };
-  const recordP2 = { timestamp, date: dateStr, kit, outcome, winner, player1: p1, player2: p2, player1_score: s1, player2_score: s2, result: winner.toLowerCase() === p2.toLowerCase() ? 'Won' : 'Lost' };
+  const recordP1 = { duel_number: duelNumber, id: duelNumber, timestamp, date: dateStr, kit, outcome, winner, player1: p1, player2: p2, player1_score: s1, player2_score: s2, result: winner.toLowerCase() === p1.toLowerCase() ? 'Won' : 'Lost' };
+  const recordP2 = { duel_number: duelNumber, id: duelNumber, timestamp, date: dateStr, kit, outcome, winner, player1: p1, player2: p2, player1_score: s1, player2_score: s2, result: winner.toLowerCase() === p2.toLowerCase() ? 'Won' : 'Lost' };
 
   if (!auth || !auth.currentUser) {
     return alert("Sign in with Google is required to submit a duel. GitHub Pages cannot use the Admin SDK.");
@@ -1908,6 +1983,12 @@ async function submitDuelFromSite() {
 
     await firestoreWriteDoc('duels', p1, { player: p1, duels: p1List, count: p1List.length, last_updated: dateStr });
     await firestoreWriteDoc('duels', p2, { player: p2, duels: p2List, count: p2List.length, last_updated: dateStr });
+    try {
+      await firestoreWriteDoc('duels', 'all_duels', { total_count: duelNumber });
+    } catch (e) {
+      console.warn('Could not persist duels/all_duels total_count:', e.message);
+    }
+    noteDuelIntegerId(duelNumber);
 
     if (newTier) {
       let kitData = {};

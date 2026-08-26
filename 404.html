@@ -15,7 +15,7 @@
       if (path.includes('/duel')) {
         const parts = path.split('/').filter(Boolean);
         const maybeId = parts.length >= 2 ? parts[parts.length - 1] : '';
-        if (maybeId && maybeId !== 'duels' && maybeId !== 'duel' && !params.has('duel')) {
+        if (/^[1-9]\d{0,8}$/.test(maybeId) && !params.has('duel')) {
           params.set('duel', maybeId);
         }
         params.set('tab', 'duels');
