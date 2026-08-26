@@ -529,6 +529,12 @@
     <div class="incidents-card">
 
       <div class="incident-item">
+        <div class="incident-date">August 26, 2026 — 11:15 UTC</div>
+        <div class="incident-title">Resolved: Firestore 403s & Discord Bot Data Layer</div>
+        <div class="incident-desc">Anonymous REST writes were failing closed and the bot treated that as success, serving stale JSON. The bot now uses the Firebase Admin SDK on Railway. Duel identity is one integer (`#365` next). Site share links are `?tab=duels&duel=365`. Firestore rules: public read on rankings/duels, no client writes. Save Profile / Submit Duel on the website stay disabled until those writes go through the bot.</div>
+      </div>
+
+      <div class="incident-item">
         <div class="incident-date">August 7, 2026 — 20:00 UTC</div>
         <div class="incident-title">Resolved: Firestore Rankings Cache & Duel History Alignment</div>
         <div class="incident-desc">All nested kit tier maps in Firestore have been flattened and unified. Duel perspective outcome descriptions for promoted players have been corrected across web rankings and Discord bot notifications. All services operational.</div>
