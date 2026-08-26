@@ -14,6 +14,10 @@ let CURRENT_USER = null;
 let IS_ADMIN = false;
 let WHITELIST_EMAILS = ['admin@mtctiers.com', 'mtctiers@gmail.com', 'cicweb@gmail.com', 'game1k@mtctiers.com'];
 
+const FIRESTORE_BASE = 'https://firestore.googleapis.com/v1/projects/mtctiers/databases/(default)/documents';
+let firestoreReadDenied = false;
+let firestoreStatusToastShown = false;
+
 try {
   if (typeof firebase !== 'undefined') {
     firebase.initializeApp(firebaseConfig);
@@ -87,6 +91,80 @@ async function sha256Hex(str) {
   return Array.from(new Uint8Array(hashBuf)).map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
+async function getFirebaseIdToken() {
+  if (!auth || !auth.currentUser) return '';
+  try {
+    return await auth.currentUser.getIdToken();
+  } catch (e) {
+    return '';
+  }
+}
+
+function describeFirestoreHttpError(status, context) {
+  if (status === 429) {
+    return `Firebase rate limited (HTTP 429) while ${context}.`;
+  }
+  if (status === 403 || status === 401) {
+    return `Firebase denied ${context} (HTTP ${status}). Unauthenticated client reads of rankings/players_meta/whitelist/duels are blocked. GitHub Pages cannot use the Admin SDK — the Discord bot publishes data/*.json, and AUTH_API serves live duels. Firestore rules were not opened from this site.`;
+  }
+  return `Firebase error (HTTP ${status}) while ${context}.`;
+}
+
+function notifyFirestoreReadStatus(status, context) {
+  if (status === 403 || status === 401) {
+    firestoreReadDenied = true;
+  }
+  console.warn(describeFirestoreHttpError(status, context));
+  if (firestoreStatusToastShown) return;
+  if (status === 429) {
+    firestoreStatusToastShown = true;
+    showToast('⚠️ Serving published snapshot (Firebase rate limited)');
+  } else if (status === 403 || status === 401) {
+    firestoreStatusToastShown = true;
+    showToast('⚠️ Live Firebase is not publicly readable. Showing published snapshot.');
+  }
+}
+
+async function firestoreRest(path, options = {}) {
+  const headers = Object.assign({ 'Content-Type': 'application/json' }, options.headers || {});
+  const token = await getFirebaseIdToken();
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  const url = path.startsWith('http') ? path : `${FIRESTORE_BASE}/${String(path).replace(/^\//, '')}`;
+  const fetchOpts = Object.assign({}, options, { headers });
+  delete fetchOpts.headers;
+  fetchOpts.headers = headers;
+  return fetch(url, fetchOpts);
+}
+
+async function firestoreWriteDoc(collection, docId, fieldsObj) {
+  if (!auth || !auth.currentUser) {
+    throw new Error('Sign in with Google is required to write to Firebase. GitHub Pages cannot use the Admin SDK.');
+  }
+  if (db) {
+    try {
+      await db.collection(collection).doc(docId).set(fieldsObj, { merge: true });
+      return;
+    } catch (err) {
+      console.warn('Firestore SDK write failed, trying authenticated REST:', err.message);
+    }
+  }
+
+  const payload = { fields: {} };
+  for (const [k, v] of Object.entries(fieldsObj)) {
+    if (v !== undefined) payload.fields[k] = pyToFirestoreValue(v);
+  }
+  const mask = Object.keys(fieldsObj)
+    .filter(k => fieldsObj[k] !== undefined)
+    .map(k => `updateMask.fieldPaths=${encodeURIComponent(k)}`)
+    .join('&');
+  const path = `${collection}/${encodeURIComponent(docId)}${mask ? '?' + mask : ''}`;
+  const res = await firestoreRest(path, { method: 'PATCH', body: JSON.stringify(payload) });
+  if (!res.ok) {
+    const errJson = await res.json().catch(() => ({}));
+    throw new Error(errJson.error?.message || describeFirestoreHttpError(res.status, `writing ${collection}/${docId}`));
+  }
+}
+
 const EMAIL_TO_PLAYER = {
   'ziadn6b@gmail.com': 'ziadlive',
   'v4n1shedytoffical@gmail.com': 'vorthexis',
@@ -105,7 +183,7 @@ async function checkWhitelistStatus(email) {
   const emailHash = await sha256Hex(cleanEmail);
 
   try {
-    const fsRes = await fetch("https://firestore.googleapis.com/v1/projects/mtctiers/databases/(default)/documents/rankings/whitelist");
+    const fsRes = await firestoreRest('rankings/whitelist');
     if (fsRes.ok) {
       const doc = await fsRes.json();
       const rawEntriesStr = doc.fields?.entries?.stringValue;
@@ -117,6 +195,12 @@ async function checkWhitelistStatus(email) {
           }
         } catch (e) {}
       }
+    } else if (fsRes.status === 403 || fsRes.status === 401) {
+      console.warn(describeFirestoreHttpError(fsRes.status, 'reading rankings/whitelist'));
+    } else if (fsRes.status === 429) {
+      notifyFirestoreReadStatus(429, 'reading rankings/whitelist');
+    } else {
+      console.warn(describeFirestoreHttpError(fsRes.status, 'reading rankings/whitelist'));
     }
   } catch (e) {
     console.warn("Whitelist fetch note:", e.message);
@@ -382,11 +466,10 @@ async function destroyCache() {
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
-  purgeDataCaches();
   initMusicPlayer();
   checkAppInstalledState();
   await loadRankingsData();
-  handleUrlParamsOnLoad();
+  await handleUrlParamsOnLoad();
 });
 
 function parseFirestoreValue(fieldVal) {
@@ -509,47 +592,53 @@ async function loadRankingsData() {
       return;
     }
 
-    // 2. Fetch directly from Firebase Firestore REST API
-    try {
-      const fsRes = await fetch("https://firestore.googleapis.com/v1/projects/mtctiers/databases/(default)/documents/rankings");
-      if (fsRes.status === 429) {
-        console.warn("⚠️ Firebase REST API Rate Limited (HTTP 429). Using static data/rankings.json fallback.");
-        showToast("⚠️ Serving cached data (Firebase Rate Limited)");
-      } else if (fsRes.ok) {
-        const fsData = await fsRes.json();
-        const docs = fsData.documents || [];
-        if (docs.length) {
-          docs.forEach(doc => {
-            const docId = doc.name.split('/').pop();
-            if (docId === 'players_meta') {
-              const rawPlayers = doc.fields?.players?.arrayValue?.values || [];
-              DATA.Players = rawPlayers.map(item => parseFirestoreMap(item.mapValue?.fields || {}));
-            } else if (docId === 'whitelist') {
-              const rawEntriesStr = doc.fields?.entries?.stringValue;
-              if (rawEntriesStr) {
-                try { WHITELIST_ENTRIES = JSON.parse(rawEntriesStr); } catch (e) {}
+    // 2. Fetch from Firestore with the signed-in token when present.
+    // Unauthenticated REST is 403 for rankings/players_meta/whitelist — do not treat that as success.
+    if (!firestoreReadDenied) {
+      try {
+        const fsRes = await firestoreRest('rankings?pageSize=100');
+        if (fsRes.status === 429) {
+          notifyFirestoreReadStatus(429, 'reading rankings');
+        } else if (fsRes.status === 403 || fsRes.status === 401) {
+          notifyFirestoreReadStatus(fsRes.status, 'reading rankings');
+        } else if (fsRes.ok) {
+          const fsData = await fsRes.json();
+          const docs = fsData.documents || [];
+          if (docs.length) {
+            docs.forEach(doc => {
+              const docId = doc.name.split('/').pop();
+              if (docId === 'players_meta') {
+                const rawPlayers = doc.fields?.players?.arrayValue?.values || [];
+                DATA.Players = rawPlayers.map(item => parseFirestoreMap(item.mapValue?.fields || {}));
+              } else if (docId === 'whitelist') {
+                const rawEntriesStr = doc.fields?.entries?.stringValue;
+                if (rawEntriesStr) {
+                  try { WHITELIST_ENTRIES = JSON.parse(rawEntriesStr); } catch (e) {}
+                }
+              } else if (['Overall', 'config', 'admin_guide', 'queue_state', 'all_data', 'main'].includes(docId)) {
+                // Exclude non-kit metadata documents
+              } else {
+                let parsedDoc = parseFirestoreMap(doc.fields || {});
+                if (parsedDoc && parsedDoc.tiers && typeof parsedDoc.tiers === 'object') {
+                  parsedDoc = parsedDoc.tiers;
+                }
+                DATA[docId] = parsedDoc;
               }
-            } else if (['Overall', 'config', 'admin_guide', 'queue_state', 'all_data', 'main'].includes(docId)) {
-              // Exclude non-kit metadata documents
-            } else {
-              let parsedDoc = parseFirestoreMap(doc.fields || {});
-              if (parsedDoc && parsedDoc.tiers && typeof parsedDoc.tiers === 'object') {
-                parsedDoc = parsedDoc.tiers;
-              }
-              DATA[docId] = parsedDoc;
-            }
-          });
-          loadedFromFirestore = true;
-          try {
-            localStorage.setItem('MTCTIERS_RANKINGS_CACHE_V2', JSON.stringify({ ts: now, data: DATA }));
-          } catch (e) {}
+            });
+            loadedFromFirestore = true;
+            try {
+              localStorage.setItem('MTCTIERS_RANKINGS_CACHE_V2', JSON.stringify({ ts: now, data: DATA }));
+            } catch (e) {}
+          }
+        } else {
+          notifyFirestoreReadStatus(fsRes.status, 'reading rankings');
         }
+      } catch (e) {
+        console.warn("Direct Firestore REST load note:", e.message);
       }
-    } catch (e) {
-      console.warn("Direct Firestore REST load note:", e.message);
     }
 
-    // 3. Fallback to local rankings.json if offline or rate-limited
+    // 3. Published snapshot (bot/Admin SDK → data/rankings.json). Used when Firestore is 403/429/offline.
     if (!loadedFromFirestore) {
       if (cachedObj && cachedObj.data) {
         DATA = cachedObj.data;
@@ -596,15 +685,10 @@ function isMobileDevice() {
   return window.innerWidth <= 768 || /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 }
 
-function switchTab(tab) {
+function switchTab(tab, options) {
   if (tab === '2fa') {
     if (!CURRENT_USER) {
       showToast("🔒 2FA Authenticator requires login. Please sign in with Google!");
-      switchTab('home');
-      return;
-    }
-    if (!isMobileDevice()) {
-      showToast("📱 2FA Authenticator is Mobile Only! Open MTCTiers on your phone.");
       switchTab('home');
       return;
     }
@@ -644,7 +728,9 @@ function switchTab(tab) {
     if (podiumWrap) { podiumWrap.style.display = 'none'; podiumWrap.innerHTML = ''; }
   }
 
-  renderCurrentTab();
+  if (!(options && options.skipRender)) {
+    renderCurrentTab();
+  }
 }
 
 function updateKitBarActive(kitName) {
@@ -1026,38 +1112,6 @@ function duelDescLine(d, playerName) {
   return `${kit}${tier ? ' · ' + tier : ''}`.trim();
 }
 
-function openDuelPopupById(id, perspective) {
-  const d = DUELS_REGISTRY.get(String(id));
-  if (!d) return;
-  openDuelPopup(d, perspective);
-}
-
-function openDuelPopup(d, perspective) {
-  const p = perspective || d.player1;
-  const info = duelPerspective(d, p);
-  const date = new Date(d.timestamp || d.created_at * 1000 || Date.now()).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-  const desc = duelDescLine(d, p);
-  const cardColor = info.won ? 'var(--emerald)' : 'var(--crimson)';
-
-  document.getElementById('duelPopupContent').innerHTML = `
-    <div style="text-align:center;">
-      <div style="font-family:var(--font-mono);font-size:0.75rem;color:var(--text-muted);letter-spacing:2px;margin-bottom:12px;">${d.kit || ''} ${d.tier && d.tier !== 'Unknown' ? '· ' + d.tier : ''}</div>
-      <div style="font-family:var(--font-mono);font-size:0.8rem;color:${cardColor};border:1px solid ${cardColor};border-radius:20px;padding:4px 16px;display:inline-block;margin-bottom:16px;letter-spacing:1px;font-weight:700;">${desc}</div>
-      <div style="display:flex;align-items:center;justify-content:center;gap:16px;margin-bottom:16px;">
-        <span style="font-family:var(--font-heading);font-weight:800;font-size:1.2rem;color:#fff;cursor:pointer;" onclick="closeDuelPopup();openProfile('${d.player1}')">${d.player1}</span>
-        <span style="font-family:var(--font-mono);font-size:0.8rem;color:var(--cyan);">VS</span>
-        <span style="font-family:var(--font-heading);font-weight:800;font-size:1.2rem;color:#fff;cursor:pointer;" onclick="closeDuelPopup();openProfile('${d.player2}')">${d.player2}</span>
-      </div>
-      <div style="font-family:var(--font-heading);font-weight:900;font-size:3rem;color:${cardColor};letter-spacing:4px;line-height:1;margin-bottom:12px;">${d.player1_score} - ${d.player2_score}</div>
-      <div style="font-family:var(--font-mono);font-size:0.75rem;color:var(--text-dim);">${date}</div>
-    </div>`;
-  document.getElementById('duelPopupModal').classList.add('active');
-}
-
-function closeDuelPopup() {
-  document.getElementById('duelPopupModal').classList.remove('active');
-}
-
 function parseFirestoreMap(fields) {
   if (!fields || typeof fields !== 'object') return {};
   const d = {};
@@ -1067,7 +1121,10 @@ function parseFirestoreMap(fields) {
 
     if (valObj.stringValue !== undefined) d[k] = valObj.stringValue;
     else if (valObj.integerValue !== undefined) d[k] = parseInt(valObj.integerValue, 10);
+    else if (valObj.doubleValue !== undefined) d[k] = valObj.doubleValue;
     else if (valObj.booleanValue !== undefined) d[k] = valObj.booleanValue;
+    else if (valObj.timestampValue !== undefined) d[k] = valObj.timestampValue;
+    else if (valObj.nullValue !== undefined) d[k] = null;
     else if (valObj.arrayValue !== undefined) {
       d[k] = (valObj.arrayValue.values || []).map(item => parseFirestoreMapVal(item));
     }
@@ -1081,7 +1138,10 @@ function parseFirestoreMapVal(item) {
   if (!item || typeof item !== 'object') return item;
   if (item.stringValue !== undefined) return item.stringValue;
   if (item.integerValue !== undefined) return parseInt(item.integerValue, 10);
+  if (item.doubleValue !== undefined) return item.doubleValue;
   if (item.booleanValue !== undefined) return item.booleanValue;
+  if (item.timestampValue !== undefined) return item.timestampValue;
+  if (item.nullValue !== undefined) return null;
   if (item.mapValue) return parseFirestoreMap(item.mapValue.fields || {});
   if (item.arrayValue) return (item.arrayValue.values || []).map(parseFirestoreMapVal);
   return Object.values(item)[0];
@@ -1097,6 +1157,20 @@ function dedupeAndSortDuels(duels) {
   return list.sort((a, b) => new Date(b.timestamp || b.created_at * 1000 || 0) - new Date(a.timestamp || a.created_at * 1000 || 0));
 }
 
+function collectDuelsFromPayload(payload, into) {
+  if (!payload) return;
+  if (Array.isArray(payload)) {
+    into.push(...payload);
+  } else if (Array.isArray(payload.duels)) {
+    into.push(...payload.duels);
+  } else if (typeof payload === 'object') {
+    Object.values(payload).forEach(val => {
+      if (Array.isArray(val)) into.push(...val);
+      else if (val && Array.isArray(val.duels)) into.push(...val.duels);
+    });
+  }
+}
+
 async function fetchDuelsFromFirestore(playerFilter) {
   let allDuels = [];
   const now = Date.now();
@@ -1107,30 +1181,14 @@ async function fetchDuelsFromFirestore(playerFilter) {
     try { cachedDuelsObj = JSON.parse(cachedDuelsStr); } catch (e) {}
   }
 
-  // Load from local data/duels.json first (complete backup)
-  try {
-    const res = await fetch(`data/duels.json?v=${now}`);
-    if (res.ok) {
-      const localData = await res.json();
-      if (Array.isArray(localData)) allDuels.push(...localData);
-      else if (localData && Array.isArray(localData.duels)) allDuels.push(...localData.duels);
-      else if (typeof localData === 'object') {
-        Object.values(localData).forEach(val => {
-          if (Array.isArray(val)) allDuels.push(...val);
-          else if (val && Array.isArray(val.duels)) allDuels.push(...val.duels);
-        });
-      }
-    }
-  } catch (e) { console.warn("Local duels.json fetch note:", e.message); }
-
-  // Merge with Firestore live duels if not rate limited & cache expired (> 30s)
-  let fetchedFirestore = false;
-  if (!cachedDuelsObj || !cachedDuelsObj.ts || (now - cachedDuelsObj.ts > 30000)) {
+  // 1. Firestore (authenticated when possible). Unauthenticated list is 403 — do not treat as success.
+  if (!firestoreReadDenied) {
     try {
-      const baseREST = "https://firestore.googleapis.com/v1/projects/mtctiers/databases/(default)/documents/duels";
-      const res = await fetch(`${baseREST}?pageSize=300`);
+      const res = await firestoreRest('duels?pageSize=300');
       if (res.status === 429) {
-        console.warn("⚠️ Firestore Duels REST Rate Limited (HTTP 429). Using cached duels.");
+        notifyFirestoreReadStatus(429, 'reading duels');
+      } else if (res.status === 403 || res.status === 401) {
+        notifyFirestoreReadStatus(res.status, 'reading duels');
       } else if (res.ok) {
         const data = await res.json();
         const docs = data.documents || [];
@@ -1140,12 +1198,35 @@ async function fetchDuelsFromFirestore(playerFilter) {
             allDuels.push(parseFirestoreMap(item.mapValue?.fields || {}));
           });
         });
-        fetchedFirestore = true;
+      } else {
+        notifyFirestoreReadStatus(res.status, 'reading duels');
       }
     } catch (e) { console.warn("Firestore REST duels note:", e.message); }
   }
 
-  if (!fetchedFirestore && cachedDuelsObj && Array.isArray(cachedDuelsObj.duels)) {
+  // 2. Existing Railway AUTH_API — live duels when Firestore is not publicly readable.
+  try {
+    const url = playerFilter
+      ? `${AUTH_API}/duels?player=${encodeURIComponent(playerFilter)}&limit=200`
+      : `${AUTH_API}/duels?limit=200`;
+    const res = await fetch(url);
+    if (res.ok) {
+      const data = await res.json();
+      collectDuelsFromPayload(data, allDuels);
+    } else {
+      console.warn('AUTH_API duels HTTP', res.status);
+    }
+  } catch (e) { console.warn("AUTH_API duels note:", e.message); }
+
+  // 3. Published snapshot (bot → data/duels.json)
+  try {
+    const res = await fetch(`data/duels.json?v=${now}`);
+    if (res.ok) {
+      collectDuelsFromPayload(await res.json(), allDuels);
+    }
+  } catch (e) { console.warn("Local duels.json fetch note:", e.message); }
+
+  if (cachedDuelsObj && Array.isArray(cachedDuelsObj.duels)) {
     allDuels.push(...cachedDuelsObj.duels);
   }
 
@@ -1156,7 +1237,7 @@ async function fetchDuelsFromFirestore(playerFilter) {
 
   if (playerFilter) {
     const cleanP = playerFilter.toLowerCase().trim();
-    return combined.filter(d => 
+    return combined.filter(d =>
       (d.player1 && d.player1.toLowerCase().trim() === cleanP) ||
       (d.player2 && d.player2.toLowerCase().trim() === cleanP)
     );
@@ -1175,13 +1256,14 @@ async function renderDuelsView(playerFilter) {
     let duels = await fetchDuelsFromFirestore(playerFilter);
 
     if (!duels || !duels.length) {
-      const base = AUTH_API.replace('/api', '');
       const url = playerFilter
-        ? `${base}/api/duels?player=${encodeURIComponent(playerFilter)}&limit=50`
-        : `${base}/api/duels?limit=100`;
+        ? `${AUTH_API}/duels?player=${encodeURIComponent(playerFilter)}&limit=50`
+        : `${AUTH_API}/duels?limit=200`;
       const res = await fetch(url);
-      const data = await res.json();
-      duels = data.duels || [];
+      if (res.ok) {
+        const data = await res.json();
+        duels = data.duels || [];
+      }
     }
 
     if (!duels.length) {
@@ -1243,8 +1325,7 @@ async function renderProfileDuels(playerName) {
     let duels = await fetchDuelsFromFirestore(playerName);
 
     if (!duels || !duels.length) {
-      const base = AUTH_API.replace('/api', '');
-      const res = await fetch(`${base}/api/duels?player=${encodeURIComponent(playerName)}&limit=50`);
+      const res = await fetch(`${AUTH_API}/duels?player=${encodeURIComponent(playerName)}&limit=50`);
       if (res.ok) {
         const data = await res.json();
         duels = data.duels || [];
@@ -1315,7 +1396,26 @@ function selectKit(kit) {
   renderCurrentTab();
 }
 
+function resolvePlayerName(raw) {
+  if (!raw) return null;
+  let clean = String(raw);
+  try { clean = decodeURIComponent(clean); } catch (e) {}
+  clean = clean.replace(/\+/g, ' ').trim();
+  if (!clean) return null;
+  const keys = Object.keys(DATA.Overall || {});
+  const exact = keys.find(p => p === clean);
+  if (exact) return exact;
+  const lower = clean.toLowerCase();
+  const ci = keys.find(p => p.toLowerCase() === lower);
+  return ci || clean;
+}
+
+function siteShareBase() {
+  return `${window.location.origin}/`;
+}
+
 async function openProfile(name) {
+  name = resolvePlayerName(name) || name;
   CURRENT_PLAYER = name;
   const overlay = document.getElementById('profileModalOverlay');
   const modal = document.getElementById('profileModal');
@@ -1327,8 +1427,9 @@ async function openProfile(name) {
   document.getElementById('pName').innerText = name;
 
   const sortedOverall = Object.entries(DATA.Overall).sort((a, b) => b[1] - a[1]);
-  const rankIndex = sortedOverall.findIndex(([p]) => p === name);
-  const targetPts = DATA.Overall[name] || 0;
+  const rankIndex = sortedOverall.findIndex(([p]) => p.toLowerCase() === name.toLowerCase());
+  const overallKey = rankIndex !== -1 ? sortedOverall[rankIndex][0] : name;
+  const targetPts = DATA.Overall[overallKey] || DATA.Overall[name] || 0;
   const rankNum = rankIndex !== -1 ? rankIndex + 1 : 999;
   const tInfo = getPlayerTitle(targetPts, rankNum);
 
@@ -1416,7 +1517,9 @@ async function openProfile(name) {
   renderProfileDuels(name);
 
   if (window.history && window.history.replaceState) {
-    window.history.replaceState(null, '', `?player=${encodeURIComponent(name)}`);
+    const params = new URLSearchParams(window.location.search);
+    params.set('player', name);
+    window.history.replaceState(null, '', `${window.location.pathname}?${params.toString()}`);
   }
 
   overlay.classList.add('active');
@@ -1425,14 +1528,18 @@ async function openProfile(name) {
 function closeProfileModal() {
   document.getElementById('profileModalOverlay').classList.remove('active');
   if (window.history && window.history.replaceState) {
-    window.history.replaceState(null, '', window.location.pathname);
+    const params = new URLSearchParams(window.location.search);
+    params.delete('player');
+    params.delete('p');
+    const qs = params.toString();
+    window.history.replaceState(null, '', qs ? `${window.location.pathname}?${qs}` : window.location.pathname);
   }
 }
 
 const DUELS_REGISTRY = new Map();
 
 function copyDuelLink(duelId, playerName) {
-  const baseUrl = window.location.origin + window.location.pathname;
+  const baseUrl = siteShareBase();
   let shareUrl = `${baseUrl}?tab=duels&duel=${encodeURIComponent(duelId)}`;
   if (playerName) {
     shareUrl += `&player=${encodeURIComponent(playerName)}`;
@@ -1536,8 +1643,10 @@ function openDuelPopup(duel, perspective) {
 }
 
 function closeDuelPopup() {
-  const modal = document.getElementById('duelPopupModalOverlay');
-  if (modal) modal.classList.remove('active');
+  const overlay = document.getElementById('duelPopupModalOverlay');
+  if (overlay) overlay.classList.remove('active');
+  const htmlModal = document.getElementById('duelPopupModal');
+  if (htmlModal) htmlModal.classList.remove('active');
 }
 
 function closeModalOnBackdrop(e) {
@@ -1562,34 +1671,47 @@ async function handleUrlParamsOnLoad() {
     if (params.has('tab')) targetTab = params.get('tab');
   }
 
-  if (!targetPlayer && hash) {
+  if (hash) {
     const rawHash = hash.substring(1).trim();
-    if (rawHash.startsWith('player=')) targetPlayer = rawHash.replace('player=', '');
-    else if (!rawHash.includes('=')) targetPlayer = rawHash;
+    if (!targetPlayer && rawHash.startsWith('player=')) targetPlayer = rawHash.replace('player=', '');
+    else if (!targetDuelId && rawHash.startsWith('duel=')) targetDuelId = rawHash.replace('duel=', '');
+    else if (!targetPlayer && rawHash && !rawHash.includes('=')) targetPlayer = rawHash;
+  }
+
+  if (targetPlayer) {
+    targetPlayer = resolvePlayerName(targetPlayer);
   }
 
   if (targetDuelId) {
-    switchTab('duels');
+    switchTab('duels', { skipRender: true });
     await renderDuelsView(targetPlayer);
     openDuelPopupById(targetDuelId, targetPlayer);
-  } else if (targetTab === 'duels') {
-    switchTab('duels');
+    return;
+  }
+
+  if (targetTab === 'duels') {
+    switchTab('duels', { skipRender: true });
     await renderDuelsView(targetPlayer);
-  } else if (targetPlayer) {
-    const cleanName = decodeURIComponent(targetPlayer).replace(/\+/g, ' ').trim();
-    if (cleanName) {
-      setTimeout(() => {
-        openProfile(cleanName);
-      }, 200);
+    return;
+  }
+
+  if (targetTab === 'hof' || targetTab === 'testers' || targetTab === 'rankings' || targetTab === 'rules' || targetTab === '2fa') {
+    switchTab(targetTab);
+    if (targetPlayer && targetTab !== '2fa') {
+      setTimeout(() => openProfile(targetPlayer), 200);
     }
+    return;
+  }
+
+  if (targetPlayer) {
+    setTimeout(() => openProfile(targetPlayer), 200);
   }
 }
 
 function copyProfileLink(playerName) {
   const pName = playerName || CURRENT_PLAYER || '';
   if (!pName) return;
-  const baseUrl = window.location.origin + window.location.pathname;
-  const shareUrl = `${baseUrl}?player=${encodeURIComponent(pName)}`;
+  const shareUrl = `${siteShareBase()}?player=${encodeURIComponent(pName)}`;
   if (navigator.clipboard && navigator.clipboard.writeText) {
     navigator.clipboard.writeText(shareUrl).then(() => {
       showToast(`🔗 Copied profile link for ${pName}!`);
@@ -1604,7 +1726,7 @@ function copyProfileLink(playerName) {
 function copyEmbedCode(playerName) {
   const pName = playerName || CURRENT_PLAYER || '';
   if (!pName) return;
-  const embedCode = `<iframe src="${window.location.origin}${window.location.pathname}?player=${encodeURIComponent(pName)}" width="500" height="600" frameborder="0"></iframe>`;
+  const embedCode = `<iframe src="${siteShareBase()}?player=${encodeURIComponent(pName)}" width="500" height="600" frameborder="0"></iframe>`;
   if (navigator.clipboard && navigator.clipboard.writeText) {
     navigator.clipboard.writeText(embedCode).then(() => {
       showToast(`⚡ Copied embed code for ${pName}!`);
@@ -1617,23 +1739,21 @@ function copyEmbedCode(playerName) {
 }
 
 function showToast(msg) {
-  let toast = document.getElementById('toastNotification');
+  let toast = document.getElementById('toast') || document.getElementById('toastNotification');
   if (!toast) {
     toast = document.createElement('div');
-    toast.id = 'toastNotification';
-    toast.style.cssText = `
-      position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
-      background: rgba(13, 27, 42, 0.95); border: 1px solid var(--cyan);
-      box-shadow: 0 0 20px rgba(0, 238, 255, 0.4); color: #fff;
-      padding: 12px 24px; border-radius: 30px; font-family: var(--font-heading);
-      font-size: 0.9rem; font-weight: 700; z-index: 10000; opacity: 0; transition: opacity 0.3s ease;
-      pointer-events: none;
-    `;
+    toast.id = 'toast';
+    toast.className = 'toast';
     document.body.appendChild(toast);
   }
   toast.innerText = msg;
+  toast.classList.add('show');
   toast.style.opacity = '1';
-  setTimeout(() => { toast.style.opacity = '0'; }, 3000);
+  clearTimeout(showToast._hideTimer);
+  showToast._hideTimer = setTimeout(() => {
+    toast.classList.remove('show');
+    toast.style.opacity = '0';
+  }, 3200);
 }
 
 function animatePointsCount(targetPts) {
@@ -1757,45 +1877,66 @@ async function submitDuelFromSite() {
   const dateStr = new Date().toISOString().split('T')[0];
   const timestamp = Date.now();
 
-  const recordP1 = { timestamp, date: dateStr, kit, outcome, player1: p1, player2: p2, player1_score: s1, player2_score: s2, result: winner.toLowerCase() === p1.toLowerCase() ? 'Won' : 'Lost' };
-  const recordP2 = { timestamp, date: dateStr, kit, outcome, player1: p1, player2: p2, player1_score: s1, player2_score: s2, result: winner.toLowerCase() === p2.toLowerCase() ? 'Won' : 'Lost' };
+  const recordP1 = { timestamp, date: dateStr, kit, outcome, winner, player1: p1, player2: p2, player1_score: s1, player2_score: s2, result: winner.toLowerCase() === p1.toLowerCase() ? 'Won' : 'Lost' };
+  const recordP2 = { timestamp, date: dateStr, kit, outcome, winner, player1: p1, player2: p2, player1_score: s1, player2_score: s2, result: winner.toLowerCase() === p2.toLowerCase() ? 'Won' : 'Lost' };
+
+  if (!auth || !auth.currentUser) {
+    return alert("Sign in with Google is required to submit a duel. GitHub Pages cannot use the Admin SDK.");
+  }
 
   showToast("Submitting duel & updating rankings...");
 
   try {
+    let p1List = [];
+    let p2List = [];
     if (db) {
-      const p1Ref = db.collection('duels').doc(p1);
-      const p1Doc = await p1Ref.get();
-      let p1List = p1Doc.exists && Array.isArray(p1Doc.data().duels) ? p1Doc.data().duels : [];
-      p1List.unshift(recordP1);
-      await p1Ref.set({ player: p1, duels: p1List, count: p1List.length, last_updated: dateStr }, { merge: true });
-
-      const p2Ref = db.collection('duels').doc(p2);
-      const p2Doc = await p2Ref.get();
-      let p2List = p2Doc.exists && Array.isArray(p2Doc.data().duels) ? p2Doc.data().duels : [];
-      p2List.unshift(recordP2);
-      await p2Ref.set({ player: p2, duels: p2List, count: p2List.length, last_updated: dateStr }, { merge: true });
-
-      if (newTier) {
-        const kitRef = db.collection('rankings').doc(kit);
-        const kitDoc = await kitRef.get();
-        let kitData = kitDoc.exists ? kitDoc.data() : {};
-        if (kitData.tiers) kitData = kitData.tiers;
-
-        for (let t in kitData) {
-          if (Array.isArray(kitData[t])) {
-            kitData[t] = kitData[t].filter(name => name.toLowerCase() !== winner.toLowerCase());
-          }
-        }
-        if (!kitData[newTier]) kitData[newTier] = [];
-        if (!kitData[newTier].includes(winner)) kitData[newTier].push(winner);
-
-        await kitRef.set({ tiers: kitData }, { merge: true });
-        DATA[kit] = kitData;
-        computeOverallPoints();
+      try {
+        const p1Doc = await db.collection('duels').doc(p1).get();
+        p1List = p1Doc.exists && Array.isArray(p1Doc.data().duels) ? p1Doc.data().duels : [];
+      } catch (e) {
+        console.warn('Could not read existing P1 duels:', e.message);
+      }
+      try {
+        const p2Doc = await db.collection('duels').doc(p2).get();
+        p2List = p2Doc.exists && Array.isArray(p2Doc.data().duels) ? p2Doc.data().duels : [];
+      } catch (e) {
+        console.warn('Could not read existing P2 duels:', e.message);
       }
     }
+    p1List.unshift(recordP1);
+    p2List.unshift(recordP2);
 
+    await firestoreWriteDoc('duels', p1, { player: p1, duels: p1List, count: p1List.length, last_updated: dateStr });
+    await firestoreWriteDoc('duels', p2, { player: p2, duels: p2List, count: p2List.length, last_updated: dateStr });
+
+    if (newTier) {
+      let kitData = {};
+      if (db) {
+        try {
+          const kitDoc = await db.collection('rankings').doc(kit).get();
+          kitData = kitDoc.exists ? kitDoc.data() : {};
+        } catch (e) {
+          kitData = DATA[kit] ? { tiers: DATA[kit] } : {};
+        }
+      } else if (DATA[kit]) {
+        kitData = { tiers: DATA[kit] };
+      }
+      if (kitData.tiers) kitData = kitData.tiers;
+
+      for (let t in kitData) {
+        if (Array.isArray(kitData[t])) {
+          kitData[t] = kitData[t].filter(name => String(name).toLowerCase() !== winner.toLowerCase());
+        }
+      }
+      if (!kitData[newTier]) kitData[newTier] = [];
+      if (!kitData[newTier].includes(winner)) kitData[newTier].push(winner);
+
+      await firestoreWriteDoc('rankings', kit, { tiers: kitData });
+      DATA[kit] = kitData;
+      computeOverallPoints();
+    }
+
+    try { localStorage.removeItem('MTCTIERS_DUELS_CACHE_V2'); } catch (e) {}
     closeSubmitDuelModal();
     showToast("⚔️ Duel recorded & Tier updated!");
     renderCurrentTab();
@@ -1888,6 +2029,7 @@ async function saveProfileCustomization() {
     description
   };
 
+  const previousPlayers = JSON.parse(JSON.stringify(DATA.Players || []));
   if (pIndex !== -1) {
     DATA.Players[pIndex] = updatedObj;
   } else {
@@ -1898,49 +2040,13 @@ async function saveProfileCustomization() {
   showToast("Saving profile customization...");
 
   try {
-    let saved = false;
-    if (db) {
-      try {
-        await db.collection('rankings').doc('players_meta').set({ players: DATA.Players }, { merge: true });
-        saved = true;
-      } catch (err) {
-        console.warn("Firestore SDK write note:", err.message);
-      }
-    }
-
-    if (!saved) {
-      let idToken = '';
-      if (auth && auth.currentUser) {
-        try { idToken = await auth.currentUser.getIdToken(); } catch (e) {}
-      }
-      const headers = { 'Content-Type': 'application/json' };
-      if (idToken) headers['Authorization'] = `Bearer ${idToken}`;
-
-      const patchRes = await fetch("https://firestore.googleapis.com/v1/projects/mtctiers/databases/(default)/documents/rankings/players_meta?updateMask.fieldPaths=players", {
-        method: 'PATCH',
-        headers,
-        body: JSON.stringify({
-          fields: {
-            players: {
-              arrayValue: {
-                values: DATA.Players.map(pyToFirestoreValue)
-              }
-            }
-          }
-        })
-      });
-
-      if (!patchRes.ok) {
-        const errJson = await patchRes.json().catch(() => ({}));
-        throw new Error(errJson.error?.message || `HTTP ${patchRes.status} Error`);
-      }
-    }
-
+    await firestoreWriteDoc('rankings', 'players_meta', { players: DATA.Players });
     closeEditProfileModal();
     openProfile(CURRENT_PLAYER);
     renderCurrentTab();
     showToast("✨ Profile updated successfully on Firebase!");
   } catch (e) {
+    DATA.Players = previousPlayers;
     alert("❌ Failed to save profile to Firebase database: " + e.message);
   }
 }
@@ -1971,6 +2077,16 @@ function closeAdminDashModalOnBackdrop(e) {
 
 function renderWhitelistItems() {
   const container = document.getElementById('whitelistItemsList');
+  const noteEl = document.getElementById('whitelistFirestoreNote');
+  if (noteEl) {
+    if (firestoreReadDenied) {
+      noteEl.style.display = 'block';
+      noteEl.innerText = 'Live rankings/whitelist documents are not publicly readable (Firestore HTTP 403). This list is the site hash fallback. Writes still require a signed-in admin that existing rules already allow — this site does not open public write rules. The Discord bot/Admin SDK is the durable store.';
+    } else {
+      noteEl.style.display = 'none';
+      noteEl.innerText = '';
+    }
+  }
   if (!container) return;
 
   if (!WHITELIST_ENTRIES || !WHITELIST_ENTRIES.length) {
@@ -1996,7 +2112,17 @@ function renderWhitelistItems() {
   }).join('');
 }
 
+async function persistWhitelistEntries() {
+  if (!IS_ADMIN) throw new Error('Whitelisted admin access required.');
+  const hashes = WHITELIST_ENTRIES.map(e => e.hash);
+  await firestoreWriteDoc('rankings', 'whitelist', {
+    hashes,
+    entries: JSON.stringify(WHITELIST_ENTRIES)
+  });
+}
+
 async function addEmailToWhitelist() {
+  if (!IS_ADMIN) return alert("Whitelisted admin access required.");
   const input = document.getElementById('adNewEmail');
   const roleSelect = document.getElementById('adRole');
   const playerSelect = document.getElementById('adAssignedPlayer');
@@ -2008,7 +2134,7 @@ async function addEmailToWhitelist() {
   if (!val) return alert("Please enter an email or username");
 
   const newHash = await sha256Hex(val);
-
+  const previous = WHITELIST_ENTRIES.slice();
   let existingIndex = WHITELIST_ENTRIES.findIndex(e => e.hash === newHash || (e.label && e.label.toLowerCase().includes(val)));
 
   const newEntry = {
@@ -2028,33 +2154,27 @@ async function addEmailToWhitelist() {
   renderWhitelistItems();
 
   try {
-    if (db) {
-      const hashes = WHITELIST_ENTRIES.map(e => e.hash);
-      await db.collection('rankings').doc('whitelist').set({
-        hashes,
-        entries: JSON.stringify(WHITELIST_ENTRIES)
-      });
-      showToast(`Saved ${val} permissions (${role.toUpperCase()})!`);
-    }
+    await persistWhitelistEntries();
+    showToast(`Saved ${val} permissions (${role.toUpperCase()})!`);
   } catch (e) {
+    WHITELIST_ENTRIES = previous;
+    renderWhitelistItems();
     alert("Failed to update whitelist: " + e.message);
   }
 }
 
 async function removeEmailFromWhitelist(targetHash) {
+  if (!IS_ADMIN) return alert("Whitelisted admin access required.");
+  const previous = WHITELIST_ENTRIES.slice();
   WHITELIST_ENTRIES = WHITELIST_ENTRIES.filter(e => e.hash !== targetHash);
   renderWhitelistItems();
 
   try {
-    if (db) {
-      const hashes = WHITELIST_ENTRIES.map(e => e.hash);
-      await db.collection('rankings').doc('whitelist').set({
-        hashes,
-        entries: JSON.stringify(WHITELIST_ENTRIES)
-      });
-      showToast(`Removed entry from Whitelist`);
-    }
+    await persistWhitelistEntries();
+    showToast(`Removed entry from Whitelist`);
   } catch (e) {
+    WHITELIST_ENTRIES = previous;
+    renderWhitelistItems();
     alert("Failed to update whitelist: " + e.message);
   }
 }
@@ -2085,40 +2205,6 @@ function handleSearch(val) {
     }
     popup.style.display = 'block';
   }, 100);
-}
-
-function copyProfileLink() {
-  if (!CURRENT_PLAYER) return;
-  const url = new URL(window.location.href);
-  url.searchParams.set('player', CURRENT_PLAYER);
-  navigator.clipboard.writeText(url.toString()).then(() => showToast("Profile link copied!"));
-}
-
-function copyEmbedCode() {
-  if (!CURRENT_PLAYER) return;
-  const url = new URL(window.location.href);
-  url.searchParams.set('player', CURRENT_PLAYER);
-  const code = `<iframe src="${url.toString()}" width="500" height="400" style="border:none;border-radius:16px;"></iframe>`;
-  navigator.clipboard.writeText(code).then(() => showToast("Embed iframe code copied!"));
-}
-
-function showToast(msg) {
-  const toast = document.getElementById('toast');
-  toast.innerText = msg;
-  toast.classList.add('show');
-  setTimeout(() => toast.classList.remove('show'), 2500);
-}
-
-function handleUrlParamsOnLoad() {
-  const params = new URLSearchParams(window.location.search);
-  const player = params.get('player');
-  const tab = params.get('tab');
-  if (tab === 'duels' || tab === 'hof' || tab === 'testers' || tab === 'rankings') {
-    switchTab(tab);
-  }
-  if (player && DATA.Overall && player in DATA.Overall) {
-    openProfile(player);
-  }
 }
 
 let audioPlayer = null;

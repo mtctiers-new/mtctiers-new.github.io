@@ -632,6 +632,12 @@
         const latencyMs = Math.round(t1Fs - t0Fs);
         if (res.ok) {
           updateServiceTag('firestore', 'Operational', 'emerald', `Read Ping: ${latencyMs}ms`);
+        } else if (res.status === 403 || res.status === 401) {
+          updateServiceTag('firestore', 'Restricted', 'amber', `HTTP ${res.status} — public client reads denied`);
+          allOk = false;
+        } else if (res.status === 429) {
+          updateServiceTag('firestore', 'Degraded', 'amber', `HTTP 429 rate limited`);
+          allOk = false;
         } else {
           updateServiceTag('firestore', 'Degraded', 'amber', `HTTP ${res.status}`);
           allOk = false;
