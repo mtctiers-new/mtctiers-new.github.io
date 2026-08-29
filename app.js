@@ -15,8 +15,10 @@ let IS_ADMIN = false;
 let WHITELIST_EMAILS = ['admin@mtctiers.com', 'mtctiers@gmail.com', 'cicweb@gmail.com', 'game1k@mtctiers.com'];
 
 const FIRESTORE_BASE = 'https://firestore.googleapis.com/v1/projects/mtctiers/databases/(default)/documents';
+const DISCORD_BOT_WRITE_MSG = 'Profile, duel, and whitelist changes go through the Discord bot. This site is read-only.';
 let firestoreReadDenied = false;
 let firestoreStatusToastShown = false;
+let DATA_LOAD_ERROR = '';
 
 try {
   if (typeof firebase !== 'undefined') {
@@ -105,15 +107,12 @@ function describeFirestoreHttpError(status, context) {
     return `Firebase rate limited (HTTP 429) while ${context}.`;
   }
   if (status === 403 || status === 401) {
-    return `Firebase denied ${context} (HTTP ${status}). Unauthenticated client reads of rankings/players_meta/whitelist/duels are blocked. GitHub Pages cannot use the Admin SDK — the Discord bot publishes data/*.json, and AUTH_API serves live duels. Firestore rules were not opened from this site.`;
+    return `Firebase denied ${context} (HTTP ${status}). Collection list is not public; individual rankings/kit documents are fetched directly. If those fail, the published data/*.json snapshot is shown.`;
   }
   return `Firebase error (HTTP ${status}) while ${context}.`;
 }
 
 function notifyFirestoreReadStatus(status, context) {
-  if (status === 403 || status === 401) {
-    firestoreReadDenied = true;
-  }
   console.warn(describeFirestoreHttpError(status, context));
   if (firestoreStatusToastShown) return;
   if (status === 429) {
@@ -121,7 +120,7 @@ function notifyFirestoreReadStatus(status, context) {
     showToast('⚠️ Serving published snapshot (Firebase rate limited)');
   } else if (status === 403 || status === 401) {
     firestoreStatusToastShown = true;
-    showToast('⚠️ Live Firebase is not publicly readable. Showing published snapshot.');
+    showToast('⚠️ Firestore list/doc denied (HTTP ' + status + '). Showing published snapshot.');
   }
 }
 
@@ -136,33 +135,8 @@ async function firestoreRest(path, options = {}) {
   return fetch(url, fetchOpts);
 }
 
-async function firestoreWriteDoc(collection, docId, fieldsObj) {
-  if (!auth || !auth.currentUser) {
-    throw new Error('Sign in with Google is required to write to Firebase. GitHub Pages cannot use the Admin SDK.');
-  }
-  if (db) {
-    try {
-      await db.collection(collection).doc(docId).set(fieldsObj, { merge: true });
-      return;
-    } catch (err) {
-      console.warn('Firestore SDK write failed, trying authenticated REST:', err.message);
-    }
-  }
-
-  const payload = { fields: {} };
-  for (const [k, v] of Object.entries(fieldsObj)) {
-    if (v !== undefined) payload.fields[k] = pyToFirestoreValue(v);
-  }
-  const mask = Object.keys(fieldsObj)
-    .filter(k => fieldsObj[k] !== undefined)
-    .map(k => `updateMask.fieldPaths=${encodeURIComponent(k)}`)
-    .join('&');
-  const path = `${collection}/${encodeURIComponent(docId)}${mask ? '?' + mask : ''}`;
-  const res = await firestoreRest(path, { method: 'PATCH', body: JSON.stringify(payload) });
-  if (!res.ok) {
-    const errJson = await res.json().catch(() => ({}));
-    throw new Error(errJson.error?.message || describeFirestoreHttpError(res.status, `writing ${collection}/${docId}`));
-  }
+async function firestoreWriteDoc() {
+  throw new Error(DISCORD_BOT_WRITE_MSG);
 }
 
 const EMAIL_TO_PLAYER = {
@@ -466,6 +440,7 @@ async function destroyCache() {
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
+  applyOfflineBanner(false);
   initMusicPlayer();
   checkAppInstalledState();
   await loadRankingsData();
@@ -571,89 +546,177 @@ function normalizeDataKits(dataObj) {
   return dataObj;
 }
 
-async function loadRankingsData() {
+const RANKINGS_META_SKIP = ['Overall', 'Players', 'whitelist', 'all_data', 'queue_state', 'HallOfFame', 'Testers', 'main', 'players_meta', 'config', 'admin_guide'];
+
+function countKitTierPlayers(dataObj) {
+  if (!dataObj || typeof dataObj !== 'object') return 0;
+  let count = 0;
+  for (const kit in dataObj) {
+    if (RANKINGS_META_SKIP.includes(kit)) continue;
+    const kitData = unwrapKitTiers(dataObj[kit]);
+    for (const tier in kitData) {
+      if (Array.isArray(kitData[tier])) count += kitData[tier].length;
+    }
+  }
+  return count;
+}
+
+function rankingsSnapshotLooksValid(dataObj) {
+  if (!dataObj || typeof dataObj !== 'object') return false;
+  const playerCount = Array.isArray(dataObj.Players) ? dataObj.Players.length : 0;
+  const overallCount = dataObj.Overall && typeof dataObj.Overall === 'object'
+    ? Object.keys(dataObj.Overall).length : 0;
+  return (playerCount > 0 || overallCount > 0) && countKitTierPlayers(dataObj) > 0;
+}
+
+function hasAnyKitTierArrays() {
+  return countKitTierPlayers(DATA) > 0;
+}
+
+function persistLastGoodRankings(dataObj) {
+  if (!rankingsSnapshotLooksValid(dataObj)) return;
   try {
-    let loadedFromFirestore = false;
-    const now = Date.now();
-    const cachedObjStr = localStorage.getItem('MTCTIERS_RANKINGS_CACHE_V2');
-    let cachedObj = null;
+    localStorage.setItem('MTCTIERS_RANKINGS_CACHE_V2', JSON.stringify({ ts: Date.now(), data: dataObj }));
+  } catch (e) {}
+}
 
-    if (cachedObjStr) {
-      try { cachedObj = JSON.parse(cachedObjStr); } catch (e) {}
+function readLastGoodRankings() {
+  try {
+    const cached = JSON.parse(localStorage.getItem('MTCTIERS_RANKINGS_CACHE_V2') || 'null');
+    if (cached && rankingsSnapshotLooksValid(cached.data)) return cached.data;
+  } catch (e) {}
+  return null;
+}
+
+function applyRankingsPayload(dataObj) {
+  DATA = dataObj;
+  normalizeDataKits(DATA);
+  computeOverallPoints();
+  window.DATA = DATA;
+  persistLastGoodRankings(DATA);
+}
+
+function rankingKitDocIds() {
+  return Object.keys(KIT_MAP).filter(k => k !== 'Overall');
+}
+
+async function fetchLiveRankingsFromPublicDocs() {
+  const next = { Overall: {}, Players: [] };
+  let loadedKits = 0;
+  let lastStatus = 0;
+  let lastContext = '';
+  let lastUrl = '';
+
+  const docIds = ['players_meta'].concat(rankingKitDocIds());
+  const results = await Promise.all(docIds.map(async (docId) => {
+    const path = 'rankings/' + encodeURIComponent(docId);
+    const res = await firestoreRest(path);
+    return { docId, path, res };
+  }));
+
+  for (const { docId, path, res } of results) {
+    const url = `${FIRESTORE_BASE}/${path}`;
+    if (!res.ok) {
+      lastStatus = res.status;
+      lastContext = 'reading ' + path;
+      lastUrl = url;
+      continue;
+    }
+    const json = await res.json();
+    const parsed = parseFirestoreMap(json.fields || {});
+    if (docId === 'players_meta') {
+      const rawPlayers = parsed.players;
+      if (Array.isArray(rawPlayers) && rawPlayers.length) {
+        next.Players = rawPlayers;
+      }
+    } else {
+      next[docId] = unwrapKitTiers(parsed);
+      loadedKits++;
+    }
+  }
+
+  if (rankingsSnapshotLooksValid(next) && loadedKits > 0) {
+    return { data: next };
+  }
+  return { data: null, status: lastStatus, context: lastContext, url: lastUrl };
+}
+
+async function fetchPublishedRankingsSnapshot() {
+  const url = `/data/rankings.json?v=${Date.now()}`;
+  const res = await fetch(url, { cache: 'no-store' });
+  if (!res.ok) {
+    return { data: null, status: res.status, url };
+  }
+  const json = await res.json();
+  if (!rankingsSnapshotLooksValid(json)) {
+    return { data: null, status: res.status, url, reason: 'snapshot missing players or kit arrays' };
+  }
+  return { data: json };
+}
+
+async function loadRankingsData() {
+  DATA_LOAD_ERROR = '';
+  try {
+    let applied = false;
+
+    try {
+      const live = await fetchLiveRankingsFromPublicDocs();
+      if (live.data) {
+        applyRankingsPayload(live.data);
+        applied = true;
+      } else if (live.status) {
+        notifyFirestoreReadStatus(live.status, live.context || 'reading rankings documents');
+        if (live.status !== 403 && live.status !== 401 && live.status !== 429) {
+          DATA_LOAD_ERROR = `Live rankings failed: ${live.url || live.context} (HTTP ${live.status})`;
+        }
+      }
+    } catch (e) {
+      console.warn('Direct Firestore document load note:', e.message);
     }
 
-    // 1. If cache is fresh (< 60s), load instantly
-    if (cachedObj && cachedObj.ts && (now - cachedObj.ts < 60000) && cachedObj.data) {
-      DATA = cachedObj.data;
-      normalizeDataKits(DATA);
-      computeOverallPoints();
-      window.DATA = DATA;
-      renderCurrentTab();
-      return;
-    }
-
-    // 2. Fetch from Firestore with the signed-in token when present.
-    // Unauthenticated REST is 403 for rankings/players_meta/whitelist — do not treat that as success.
-    if (!firestoreReadDenied) {
+    if (!applied) {
       try {
-        const fsRes = await firestoreRest('rankings?pageSize=100');
-        if (fsRes.status === 429) {
-          notifyFirestoreReadStatus(429, 'reading rankings');
-        } else if (fsRes.status === 403 || fsRes.status === 401) {
-          notifyFirestoreReadStatus(fsRes.status, 'reading rankings');
-        } else if (fsRes.ok) {
-          const fsData = await fsRes.json();
-          const docs = fsData.documents || [];
-          if (docs.length) {
-            docs.forEach(doc => {
-              const docId = doc.name.split('/').pop();
-              if (docId === 'players_meta') {
-                const rawPlayers = doc.fields?.players?.arrayValue?.values || [];
-                DATA.Players = rawPlayers.map(item => parseFirestoreMap(item.mapValue?.fields || {}));
-              } else if (docId === 'whitelist') {
-                const rawEntriesStr = doc.fields?.entries?.stringValue;
-                if (rawEntriesStr) {
-                  try { WHITELIST_ENTRIES = JSON.parse(rawEntriesStr); } catch (e) {}
-                }
-              } else if (['Overall', 'config', 'admin_guide', 'queue_state', 'all_data', 'main'].includes(docId)) {
-                // Exclude non-kit metadata documents
-              } else {
-                let parsedDoc = parseFirestoreMap(doc.fields || {});
-                if (parsedDoc && parsedDoc.tiers && typeof parsedDoc.tiers === 'object') {
-                  parsedDoc = parsedDoc.tiers;
-                }
-                DATA[docId] = parsedDoc;
-              }
-            });
-            loadedFromFirestore = true;
-            try {
-              localStorage.setItem('MTCTIERS_RANKINGS_CACHE_V2', JSON.stringify({ ts: now, data: DATA }));
-            } catch (e) {}
+        const snap = await fetchPublishedRankingsSnapshot();
+        if (snap.data) {
+          applyRankingsPayload(snap.data);
+          applied = true;
+          if (!firestoreStatusToastShown) {
+            firestoreStatusToastShown = true;
+            showToast('⚠️ Showing published rankings snapshot.');
           }
-        } else {
-          notifyFirestoreReadStatus(fsRes.status, 'reading rankings');
+        } else if (snap.status) {
+          DATA_LOAD_ERROR = `Published snapshot failed: ${snap.url} (HTTP ${snap.status}${snap.reason ? ' — ' + snap.reason : ''})`;
         }
       } catch (e) {
-        console.warn("Direct Firestore REST load note:", e.message);
+        DATA_LOAD_ERROR = `Published snapshot request failed: /data/rankings.json (${e.message})`;
       }
     }
 
-    // 3. Published snapshot (bot/Admin SDK → data/rankings.json). Used when Firestore is 403/429/offline.
-    if (!loadedFromFirestore) {
-      if (cachedObj && cachedObj.data) {
-        DATA = cachedObj.data;
-      } else {
-        const res = await fetch(`data/rankings.json?v=${now}`);
-        if (res.ok) DATA = await res.json();
+    if (!applied) {
+      const cached = readLastGoodRankings();
+      if (cached) {
+        applyRankingsPayload(cached);
+        applied = true;
+        if (!firestoreStatusToastShown) {
+          firestoreStatusToastShown = true;
+          showToast('⚠️ Showing last saved rankings snapshot.');
+        }
       }
     }
 
-    normalizeDataKits(DATA);
-    computeOverallPoints();
-    window.DATA = DATA;
+    if (!applied) {
+      DATA = { Overall: {}, Players: [] };
+      window.DATA = DATA;
+      if (!DATA_LOAD_ERROR) {
+        DATA_LOAD_ERROR = 'Could not load rankings from Firestore documents or /data/rankings.json.';
+      }
+    }
+
     renderCurrentTab();
   } catch (err) {
-    console.error("Failed to load rankings data:", err);
+    console.error('Failed to load rankings data:', err);
+    DATA_LOAD_ERROR = DATA_LOAD_ERROR || ('Failed to load rankings: ' + err.message);
+    renderCurrentTab();
   }
 }
 
@@ -886,6 +949,8 @@ function filterPlayerVisible(playerName) {
   if (deviceFilter && (playerMeta.device || '').toUpperCase() !== deviceFilter.toUpperCase()) {
     return false;
   }
+
+  if (!hasAnyKitTierArrays()) return true;
 
   if (retiredFilter === 'active') {
     if (!isPlayerActive(playerName)) return false;
@@ -1946,95 +2011,8 @@ function closeSubmitDuelModalOnBackdrop(e) {
 }
 
 async function submitDuelFromSite() {
-  if (!IS_ADMIN) return alert("Whitelisted staff admin access required.");
-
-  const p1 = document.getElementById('sdP1').value.trim();
-  const p2 = document.getElementById('sdP2').value.trim();
-  const kit = document.getElementById('sdKit').value;
-  const winner = document.getElementById('sdWinner').value.trim();
-  const s1 = parseInt(document.getElementById('sdS1').value, 10) || 0;
-  const s2 = parseInt(document.getElementById('sdS2').value, 10) || 0;
-  const outcome = document.getElementById('sdOutcome').value.trim() || 'Rank Match';
-  const newTier = document.getElementById('sdNewTier').value;
-
-  if (!p1 || !p2 || !winner) return alert("Please fill in Player 1, Player 2, and Winner!");
-
-  const dateStr = new Date().toISOString().split('T')[0];
-  const timestamp = Date.now();
-  const duelNumber = await allocateNextDuelIntegerId();
-
-  const recordP1 = { duel_number: duelNumber, id: duelNumber, timestamp, date: dateStr, kit, outcome, winner, player1: p1, player2: p2, player1_score: s1, player2_score: s2, result: winner.toLowerCase() === p1.toLowerCase() ? 'Won' : 'Lost' };
-  const recordP2 = { duel_number: duelNumber, id: duelNumber, timestamp, date: dateStr, kit, outcome, winner, player1: p1, player2: p2, player1_score: s1, player2_score: s2, result: winner.toLowerCase() === p2.toLowerCase() ? 'Won' : 'Lost' };
-
-  if (!auth || !auth.currentUser) {
-    return alert("Sign in with Google is required to submit a duel. GitHub Pages cannot use the Admin SDK.");
-  }
-
-  showToast("Submitting duel & updating rankings...");
-
-  try {
-    let p1List = [];
-    let p2List = [];
-    if (db) {
-      try {
-        const p1Doc = await db.collection('duels').doc(p1).get();
-        p1List = p1Doc.exists && Array.isArray(p1Doc.data().duels) ? p1Doc.data().duels : [];
-      } catch (e) {
-        console.warn('Could not read existing P1 duels:', e.message);
-      }
-      try {
-        const p2Doc = await db.collection('duels').doc(p2).get();
-        p2List = p2Doc.exists && Array.isArray(p2Doc.data().duels) ? p2Doc.data().duels : [];
-      } catch (e) {
-        console.warn('Could not read existing P2 duels:', e.message);
-      }
-    }
-    p1List.unshift(recordP1);
-    p2List.unshift(recordP2);
-
-    await firestoreWriteDoc('duels', p1, { player: p1, duels: p1List, count: p1List.length, last_updated: dateStr });
-    await firestoreWriteDoc('duels', p2, { player: p2, duels: p2List, count: p2List.length, last_updated: dateStr });
-    try {
-      await firestoreWriteDoc('duels', 'all_duels', { total_count: duelNumber });
-    } catch (e) {
-      console.warn('Could not persist duels/all_duels total_count:', e.message);
-    }
-    noteDuelIntegerId(duelNumber);
-
-    if (newTier) {
-      let kitData = {};
-      if (db) {
-        try {
-          const kitDoc = await db.collection('rankings').doc(kit).get();
-          kitData = kitDoc.exists ? kitDoc.data() : {};
-        } catch (e) {
-          kitData = DATA[kit] ? { tiers: DATA[kit] } : {};
-        }
-      } else if (DATA[kit]) {
-        kitData = { tiers: DATA[kit] };
-      }
-      if (kitData.tiers) kitData = kitData.tiers;
-
-      for (let t in kitData) {
-        if (Array.isArray(kitData[t])) {
-          kitData[t] = kitData[t].filter(name => String(name).toLowerCase() !== winner.toLowerCase());
-        }
-      }
-      if (!kitData[newTier]) kitData[newTier] = [];
-      if (!kitData[newTier].includes(winner)) kitData[newTier].push(winner);
-
-      await firestoreWriteDoc('rankings', kit, { tiers: kitData });
-      DATA[kit] = kitData;
-      computeOverallPoints();
-    }
-
-    try { localStorage.removeItem('MTCTIERS_DUELS_CACHE_V2'); } catch (e) {}
-    closeSubmitDuelModal();
-    showToast("⚔️ Duel recorded & Tier updated!");
-    renderCurrentTab();
-  } catch (e) {
-    alert("Failed to submit duel: " + e.message);
-  }
+  showToast(DISCORD_BOT_WRITE_MSG);
+  alert(DISCORD_BOT_WRITE_MSG);
 }
 
 function selectProfileEmote(emoji) {
@@ -2074,73 +2052,8 @@ function closeEditProfileModalOnBackdrop(e) {
 }
 
 async function saveProfileCustomization() {
-  if (!CURRENT_PLAYER) return;
-
-  // Strict security authorization check
-  if (!isAuthorizedToEditProfile(CURRENT_PLAYER)) {
-    alert("❌ Security Violation: You are not authorized to edit this player profile!");
-    closeEditProfileModal();
-    return;
-  }
-
-  const rawSkin = document.getElementById('epSkinUrl').value.trim();
-  const rawBanner = document.getElementById('epBannerUrl').value.trim();
-  const rawEmote = document.getElementById('epEmote').value.trim();
-  const accentColor = document.getElementById('epColor').value;
-  const lfm = document.getElementById('epLfm').value === 'ON';
-  const rawRival = document.getElementById('epRival').value.trim();
-  const rawDesc = document.getElementById('epDesc').value.trim();
-
-  // Validate URLs to prevent XSS / malicious schemes
-  const skinUrl = sanitizeSafeUrl(rawSkin);
-  const bannerUrl = sanitizeSafeUrl(rawBanner);
-
-  if (rawSkin && !skinUrl) {
-    return alert("Invalid Skin Image URL! Must start with http:// or https://");
-  }
-  if (rawBanner && !bannerUrl) {
-    return alert("Invalid Banner Image URL! Must start with http:// or https://");
-  }
-
-  const customEmote = escapeHTML(rawEmote).slice(0, 10);
-  const rival = escapeHTML(rawRival).slice(0, 50);
-  const description = escapeHTML(rawDesc).slice(0, 500);
-
-  let pIndex = (DATA.Players || []).findIndex(p => (typeof p === 'object' ? p.name : p).toLowerCase() === CURRENT_PLAYER.toLowerCase());
-  let existingObj = pIndex !== -1 && typeof DATA.Players[pIndex] === 'object' ? DATA.Players[pIndex] : { name: CURRENT_PLAYER };
-
-  const updatedObj = {
-    ...existingObj,
-    name: CURRENT_PLAYER,
-    skinUrl,
-    bannerUrl,
-    customEmote,
-    accentColor: /^#[0-9a-fA-F]{6}$/.test(accentColor) ? accentColor : '#00eeff',
-    lfm,
-    rival,
-    description
-  };
-
-  const previousPlayers = JSON.parse(JSON.stringify(DATA.Players || []));
-  if (pIndex !== -1) {
-    DATA.Players[pIndex] = updatedObj;
-  } else {
-    if (!DATA.Players) DATA.Players = [];
-    DATA.Players.push(updatedObj);
-  }
-
-  showToast("Saving profile customization...");
-
-  try {
-    await firestoreWriteDoc('rankings', 'players_meta', { players: DATA.Players });
-    closeEditProfileModal();
-    openProfile(CURRENT_PLAYER);
-    renderCurrentTab();
-    showToast("✨ Profile updated successfully on Firebase!");
-  } catch (e) {
-    DATA.Players = previousPlayers;
-    alert("❌ Failed to save profile to Firebase database: " + e.message);
-  }
+  showToast(DISCORD_BOT_WRITE_MSG);
+  alert(DISCORD_BOT_WRITE_MSG);
 }
 
 function openAdminDashModal() {
@@ -2171,13 +2084,8 @@ function renderWhitelistItems() {
   const container = document.getElementById('whitelistItemsList');
   const noteEl = document.getElementById('whitelistFirestoreNote');
   if (noteEl) {
-    if (firestoreReadDenied) {
-      noteEl.style.display = 'block';
-      noteEl.innerText = 'Live rankings/whitelist documents are not publicly readable (Firestore HTTP 403). This list is the site hash fallback. Writes still require a signed-in admin that existing rules already allow — this site does not open public write rules. The Discord bot/Admin SDK is the durable store.';
-    } else {
-      noteEl.style.display = 'none';
-      noteEl.innerText = '';
-    }
+    noteEl.style.display = 'block';
+    noteEl.innerText = DISCORD_BOT_WRITE_MSG;
   }
   if (!container) return;
 
@@ -2205,70 +2113,17 @@ function renderWhitelistItems() {
 }
 
 async function persistWhitelistEntries() {
-  if (!IS_ADMIN) throw new Error('Whitelisted admin access required.');
-  const hashes = WHITELIST_ENTRIES.map(e => e.hash);
-  await firestoreWriteDoc('rankings', 'whitelist', {
-    hashes,
-    entries: JSON.stringify(WHITELIST_ENTRIES)
-  });
+  throw new Error(DISCORD_BOT_WRITE_MSG);
 }
 
 async function addEmailToWhitelist() {
-  if (!IS_ADMIN) return alert("Whitelisted admin access required.");
-  const input = document.getElementById('adNewEmail');
-  const roleSelect = document.getElementById('adRole');
-  const playerSelect = document.getElementById('adAssignedPlayer');
-
-  const val = input.value.trim().toLowerCase();
-  const role = roleSelect ? roleSelect.value : 'player';
-  const assignedPlayer = playerSelect ? playerSelect.value : '*';
-
-  if (!val) return alert("Please enter an email or username");
-
-  const newHash = await sha256Hex(val);
-  const previous = WHITELIST_ENTRIES.slice();
-  let existingIndex = WHITELIST_ENTRIES.findIndex(e => e.hash === newHash || (e.label && e.label.toLowerCase().includes(val)));
-
-  const newEntry = {
-    label: `${val} (${role === 'admin' ? 'Admin' : 'Player'})`,
-    hash: newHash,
-    role,
-    assignedPlayer
-  };
-
-  if (existingIndex !== -1) {
-    WHITELIST_ENTRIES[existingIndex] = newEntry;
-  } else {
-    WHITELIST_ENTRIES.push(newEntry);
-  }
-
-  input.value = '';
-  renderWhitelistItems();
-
-  try {
-    await persistWhitelistEntries();
-    showToast(`Saved ${val} permissions (${role.toUpperCase()})!`);
-  } catch (e) {
-    WHITELIST_ENTRIES = previous;
-    renderWhitelistItems();
-    alert("Failed to update whitelist: " + e.message);
-  }
+  showToast(DISCORD_BOT_WRITE_MSG);
+  alert(DISCORD_BOT_WRITE_MSG);
 }
 
-async function removeEmailFromWhitelist(targetHash) {
-  if (!IS_ADMIN) return alert("Whitelisted admin access required.");
-  const previous = WHITELIST_ENTRIES.slice();
-  WHITELIST_ENTRIES = WHITELIST_ENTRIES.filter(e => e.hash !== targetHash);
-  renderWhitelistItems();
-
-  try {
-    await persistWhitelistEntries();
-    showToast(`Removed entry from Whitelist`);
-  } catch (e) {
-    WHITELIST_ENTRIES = previous;
-    renderWhitelistItems();
-    alert("Failed to update whitelist: " + e.message);
-  }
+async function removeEmailFromWhitelist() {
+  showToast(DISCORD_BOT_WRITE_MSG);
+  alert(DISCORD_BOT_WRITE_MSG);
 }
 
 let searchDebounceTimer = null;
@@ -2625,12 +2480,13 @@ function renderDashboardPodium() {
   if (!el) return;
 
   const sorted = Object.entries(DATA.Overall || {})
-    .filter(([name]) => filterPlayerVisible(name))
     .sort((a, b) => b[1] - a[1]);
 
   const top3 = sorted.slice(0, 3);
   if (!top3.length) {
-    el.innerHTML = '<div class="dash-empty">No ranked players yet</div>';
+    el.innerHTML = DATA_LOAD_ERROR
+      ? `<div class="dash-empty">${DATA_LOAD_ERROR}</div>`
+      : '<div class="dash-empty">No ranked players yet</div>';
     return;
   }
 
@@ -2705,12 +2561,13 @@ function renderDashboardLeaderboardList() {
   if (!el) return;
 
   const entries = Object.entries(DATA.Overall || {})
-    .filter(([name]) => filterPlayerVisible(name))
     .sort((a, b) => b[1] - a[1]);
 
   const top = entries.slice(0, 3);
   if (!top.length) {
-    el.innerHTML = '<div class="dash-empty">No data yet</div>';
+    el.innerHTML = DATA_LOAD_ERROR
+      ? `<div class="dash-empty">${DATA_LOAD_ERROR}</div>`
+      : '<div class="dash-empty">No data yet</div>';
     return;
   }
 
@@ -3110,13 +2967,18 @@ if ('serviceWorker' in navigator) {
 window.addEventListener('online', updateOnlineStatus);
 window.addEventListener('offline', updateOnlineStatus);
 
-function updateOnlineStatus() {
+function applyOfflineBanner(announce) {
   const offlineInd = document.getElementById('offlineIndicator');
-  if (!navigator.onLine) {
-    if (offlineInd) offlineInd.style.display = 'block';
+  const offline = navigator.onLine === false;
+  if (offlineInd) offlineInd.style.display = offline ? 'block' : 'none';
+  if (!announce) return;
+  if (offline) {
     showToast('📡 Connection Offline. Local Rankings & 2FA Active!');
   } else {
-    if (offlineInd) offlineInd.style.display = 'none';
     showToast('🟢 Online Connection Restored!');
   }
+}
+
+function updateOnlineStatus() {
+  applyOfflineBanner(true);
 }
