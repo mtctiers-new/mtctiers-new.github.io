@@ -1064,12 +1064,5 @@
         "name": "LastChance"
       }
     ]
-  },
-  "queue_state": {
-    "panelChannelId": "1524107242394091630",
-    "panelMessageId": "1534336608726286479",
-    "onlineTesters": [],
-    "lastSession": "Active now (11:08 PM)",
-    "queue": []
   }
 }
