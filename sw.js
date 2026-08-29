@@ -1,4 +1,4 @@
-const CACHE_NAME = 'mtctiers-pwa-v20260826_2';
+const CACHE_NAME = 'mtctiers-pwa-v20260829_1';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -17,10 +17,18 @@ const STATIC_ASSETS = [
   '/assets/diamond.png',
   '/assets/novelty_axe.png',
   '/assets/dragonhide_anchor.png',
-  '/assets/void.png',
-  '/data/rankings.json',
-  '/data/duels.json'
+  '/assets/void.png'
 ];
+
+function isDataJsonRequest(url) {
+  return url.origin === location.origin && url.pathname.startsWith('/data/');
+}
+
+function isCacheableStatic(url) {
+  return url.origin === location.origin &&
+    (STATIC_ASSETS.includes(url.pathname) || url.pathname.startsWith('/assets/')) &&
+    !isDataJsonRequest(url);
+}
 
 self.addEventListener('install', event => {
   self.skipWaiting();
@@ -49,29 +57,11 @@ self.addEventListener('fetch', event => {
   const req = event.request;
   const url = new URL(req.url);
 
-  // Skip non-GET requests
   if (req.method !== 'GET') return;
 
-  // Strategy 1: Static JSON files & Local Assets -> Cache First with Network Refresh
-  if (url.origin === location.origin && (STATIC_ASSETS.includes(url.pathname) || url.pathname.startsWith('/assets/'))) {
-    event.respondWith(
-      caches.match(req).then(cachedRes => {
-        const fetchPromise = fetch(req).then(networkRes => {
-          if (networkRes.status === 200) {
-            const resClone = networkRes.clone();
-            caches.open(CACHE_NAME).then(cache => cache.put(req, resClone));
-          }
-          return networkRes;
-        }).catch(() => null);
-
-        return cachedRes || fetchPromise || fetch(req);
-      })
-    );
-    return;
-  }
-
-  // Do not cache Firestore / Railway API responses (403s and live duel payloads).
-  if (url.hostname.includes('googleapis.com') || url.hostname.includes('railway.app')) {
+  // Published snapshots and live APIs: network only. Never cache-first
+  // empty/error bodies that would stick the site in Offline Mode.
+  if (isDataJsonRequest(url) || url.hostname.includes('googleapis.com') || url.hostname.includes('railway.app')) {
     event.respondWith(
       fetch(req).catch(async () => {
         if (req.mode === 'navigate') {
@@ -87,10 +77,28 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  // Strategy 2: Other requests -> Network First with Offline Cache Fallback
+  if (isCacheableStatic(url)) {
+    event.respondWith(
+      fetch(req).then(networkRes => {
+        if (networkRes && networkRes.status === 200) {
+          const resClone = networkRes.clone();
+          caches.open(CACHE_NAME).then(cache => cache.put(req, resClone));
+        }
+        return networkRes;
+      }).catch(async () => {
+        const cachedRes = await caches.match(req);
+        if (cachedRes) return cachedRes;
+        const byPath = await caches.match(url.pathname);
+        if (byPath) return byPath;
+        throw new Error('Network offline');
+      })
+    );
+    return;
+  }
+
   event.respondWith(
     fetch(req).then(networkRes => {
-      if (networkRes && networkRes.status === 200) {
+      if (networkRes && networkRes.status === 200 && url.origin === location.origin) {
         const resClone = networkRes.clone();
         caches.open(CACHE_NAME).then(cache => cache.put(req, resClone));
       }
@@ -99,7 +107,6 @@ self.addEventListener('fetch', event => {
       const cachedRes = await caches.match(req);
       if (cachedRes) return cachedRes;
 
-      // Fallback for HTML navigation requests
       if (req.mode === 'navigate') {
         const offlinePage = await caches.match('/index.html');
         if (offlinePage) return offlinePage;
