@@ -1,11 +1,10 @@
-const CACHE_NAME = 'mtctiers-pwa-v20260829_1';
+const CACHE_NAME = 'mtctiers-pwa-v20260829_2';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
   '/index.css',
   '/app.js',
   '/status.html',
-  '/guide.html',
   '/404.html',
   '/manifest.json',
   '/assets/mtctiers.png',
