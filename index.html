@@ -111,6 +111,10 @@
               <span class="user-menu-icon">🔐</span>
               <span>Account Settings & 2FA</span>
             </div>
+            <div class="user-menu-item" onclick="openAccountPrefsModal()">
+              <span class="user-menu-icon">⚙️</span>
+              <span>Account Preferences</span>
+            </div>
             <div class="user-menu-divider"></div>
             <div class="user-menu-item logout" onclick="logoutUser()">
               <span class="user-menu-icon">🚪</span>
@@ -477,6 +481,53 @@
         </div>
       </div>
       <div id="whitelistFirestoreNote" style="display:none;margin-top:8px;font-size:0.75rem;color:#fbbf24;line-height:1.4;"></div>
+    </div>
+  </div>
+
+  <!-- Account Preferences Modal (local to this browser/account only) -->
+  <div id="accountPrefsModalOverlay" class="modal-overlay" onclick="closeAccountPrefsModalOnBackdrop(event)">
+    <div class="submit-duel-card" style="max-width:440px;" onclick="event.stopPropagation()">
+      <div class="modal-close-btn" onclick="closeAccountPrefsModal()">✕</div>
+      <h2 class="modal-title">⚙️ ACCOUNT PREFERENCES</h2>
+      <p class="modal-subtitle">Personal settings for your account — synced everywhere you're signed in</p>
+
+      <div class="pref-toggle-row">
+        <div>
+          <div class="pref-toggle-title">🔇 No Music on Startup</div>
+          <div class="pref-toggle-desc">Site music won't auto-start when you load the page</div>
+        </div>
+        <label class="pref-toggle">
+          <input type="checkbox" id="prefNoMusicToggle" onchange="setNoMusicPref(this.checked)">
+          <span class="pref-toggle-track"><span class="pref-toggle-thumb"></span></span>
+        </label>
+      </div>
+
+      <div class="pref-section-divider"></div>
+
+      <div class="pref-section-title">🎨 Change Theme</div>
+      <div class="pref-section-desc">Pick your accent color across the whole site</div>
+      <div class="theme-swatch-grid" id="prefThemeSwatches">
+        <div class="theme-swatch-item">
+          <span class="theme-swatch" data-theme-choice="cyan" style="background:#00eeff;" onclick="setThemePref('cyan')" title="Cyan (Default)"></span>
+          <span class="theme-swatch-label">Cyan</span>
+        </div>
+        <div class="theme-swatch-item">
+          <span class="theme-swatch" data-theme-choice="gold" style="background:#ffd700;" onclick="setThemePref('gold')" title="Gold"></span>
+          <span class="theme-swatch-label">Gold</span>
+        </div>
+        <div class="theme-swatch-item">
+          <span class="theme-swatch" data-theme-choice="purple" style="background:#a855f7;" onclick="setThemePref('purple')" title="Purple"></span>
+          <span class="theme-swatch-label">Purple</span>
+        </div>
+        <div class="theme-swatch-item">
+          <span class="theme-swatch" data-theme-choice="emerald" style="background:#10b981;" onclick="setThemePref('emerald')" title="Emerald"></span>
+          <span class="theme-swatch-label">Emerald</span>
+        </div>
+        <div class="theme-swatch-item">
+          <span class="theme-swatch" data-theme-choice="crimson" style="background:#ef4444;" onclick="setThemePref('crimson')" title="Crimson"></span>
+          <span class="theme-swatch-label">Crimson</span>
+        </div>
+      </div>
     </div>
   </div>
 

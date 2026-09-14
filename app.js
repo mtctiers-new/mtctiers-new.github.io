@@ -45,6 +45,7 @@ try {
         if (mnav2fa) mnav2fa.style.display = 'flex';
 
         await checkWhitelistStatus(user.email);
+        await applyAccountPrefsOnLogin();
 
         const adminDashBtn = document.getElementById('adminDashBtn');
 
@@ -67,6 +68,7 @@ try {
         if (adminDashBtn) adminDashBtn.style.display = 'none';
         if (mnav2fa) mnav2fa.style.display = 'none';
         if (CURRENT_TAB === '2fa') switchTab('home');
+        applyThemePref('cyan');
       }
     });
   }
@@ -275,6 +277,7 @@ async function logoutUser() {
   if (mnav2fa) mnav2fa.style.display = 'none';
 
   if (CURRENT_TAB === '2fa') switchTab('home');
+  applyThemePref('cyan');
 
   closeUserAccountMenu();
   showToast("Logged out");
@@ -354,9 +357,196 @@ function openMyProfileCustomization() {
   }
 }
 
+/* ⚙️ ACCOUNT PREFERENCES (synced to your account via Firestore, cached locally for instant load) */
+function getPrefsAccountKey() {
+  if (!CURRENT_USER) return null;
+  // Prefer the stable Firebase uid so prefs follow the same account across devices/browsers
+  return CURRENT_USER.uid || CURRENT_USER.email || CURRENT_USER.displayName || 'GuestUser';
+}
+
+function getAccountPrefs() {
+  const key = getPrefsAccountKey();
+  if (!key) return { noMusicOnStartup: false, theme: 'cyan' };
+  try {
+    const raw = localStorage.getItem(`mtc_account_prefs_${key}`);
+    if (!raw) return { noMusicOnStartup: false, theme: 'cyan' };
+    const parsed = JSON.parse(raw);
+    return {
+      noMusicOnStartup: !!parsed.noMusicOnStartup,
+      theme: parsed.theme || 'cyan'
+    };
+  } catch (e) {
+    return { noMusicOnStartup: false, theme: 'cyan' };
+  }
+}
+
+function saveAccountPrefs(prefs) {
+  const key = getPrefsAccountKey();
+  if (!key) return;
+  try {
+    localStorage.setItem(`mtc_account_prefs_${key}`, JSON.stringify(prefs));
+  } catch (e) {
+    console.warn("Could not cache account preferences locally:", e.message);
+  }
+  pushCloudPrefs(prefs);
+}
+
+let cloudPrefsSyncWarned = false;
+
+async function pushCloudPrefs(prefs) {
+  const uid = CURRENT_USER && CURRENT_USER.uid;
+  if (!uid) return;
+  try {
+    const body = {
+      fields: {
+        noMusicOnStartup: { booleanValue: !!prefs.noMusicOnStartup },
+        theme: { stringValue: prefs.theme || 'cyan' }
+      }
+    };
+    const res = await firestoreRest(`userPrefs/${uid}`, {
+      method: 'PATCH',
+      body: JSON.stringify(body)
+    });
+    if (!res.ok && !cloudPrefsSyncWarned) {
+      cloudPrefsSyncWarned = true;
+      console.warn(describeFirestoreHttpError(res.status, 'syncing account preferences'));
+      showToast("⚠️ Saved on this device — couldn't sync to your account in the cloud");
+    }
+  } catch (e) {
+    if (!cloudPrefsSyncWarned) {
+      cloudPrefsSyncWarned = true;
+      showToast("⚠️ Saved on this device — couldn't sync to your account in the cloud");
+    }
+  }
+}
+
+async function fetchCloudPrefs() {
+  const uid = CURRENT_USER && CURRENT_USER.uid;
+  if (!uid) return null;
+  try {
+    const res = await firestoreRest(`userPrefs/${uid}`);
+    if (res.ok) {
+      const doc = await res.json();
+      const fields = doc.fields || {};
+      return {
+        noMusicOnStartup: !!parseFirestoreValue(fields.noMusicOnStartup),
+        theme: parseFirestoreValue(fields.theme) || 'cyan'
+      };
+    }
+    if (res.status !== 404) {
+      console.warn(describeFirestoreHttpError(res.status, 'reading account preferences'));
+    }
+    return null;
+  } catch (e) {
+    console.warn("Cloud prefs fetch note:", e.message);
+    return null;
+  }
+}
+
 function openMy2faSecurity() {
   closeUserAccountMenu();
   switchTab('2fa');
+}
+
+function openAccountPrefsModal() {
+  closeUserAccountMenu();
+  if (!CURRENT_USER) {
+    showToast("🔒 Please sign in to set your account preferences.");
+    return;
+  }
+  const prefs = getAccountPrefs();
+  const musicToggle = document.getElementById('prefNoMusicToggle');
+  if (musicToggle) musicToggle.checked = prefs.noMusicOnStartup;
+  updateThemeSwatchActive(prefs.theme);
+
+  document.getElementById('accountPrefsModalOverlay').classList.add('active');
+
+  // Pull the latest synced values in case they were changed on another device
+  fetchCloudPrefs().then(cloudPrefs => {
+    if (!cloudPrefs) return;
+    const key = getPrefsAccountKey();
+    if (key) {
+      try { localStorage.setItem(`mtc_account_prefs_${key}`, JSON.stringify(cloudPrefs)); } catch (e) {}
+    }
+    if (musicToggle) musicToggle.checked = cloudPrefs.noMusicOnStartup;
+    updateThemeSwatchActive(cloudPrefs.theme);
+    applyThemePref(cloudPrefs.theme);
+    if (cloudPrefs.noMusicOnStartup) {
+      disableMusicAutoplay();
+    } else {
+      enableMusicAutoplay();
+    }
+  });
+}
+
+function closeAccountPrefsModal() {
+  document.getElementById('accountPrefsModalOverlay').classList.remove('active');
+}
+
+function closeAccountPrefsModalOnBackdrop(e) {
+  if (e.target.id === 'accountPrefsModalOverlay') {
+    closeAccountPrefsModal();
+  }
+}
+
+function updateThemeSwatchActive(themeName) {
+  document.querySelectorAll('.theme-swatch').forEach(el => {
+    el.classList.toggle('active', el.dataset.themeChoice === themeName);
+  });
+}
+
+function setThemePref(themeName) {
+  const prefs = getAccountPrefs();
+  prefs.theme = themeName;
+  saveAccountPrefs(prefs);
+  applyThemePref(themeName);
+  updateThemeSwatchActive(themeName);
+  showToast(`🎨 Theme set to ${themeName.charAt(0).toUpperCase() + themeName.slice(1)} — synced to your account`);
+}
+
+function applyThemePref(themeName) {
+  if (!themeName || themeName === 'cyan') {
+    document.documentElement.removeAttribute('data-theme');
+  } else {
+    document.documentElement.setAttribute('data-theme', themeName);
+  }
+}
+
+function setNoMusicPref(isChecked) {
+  const prefs = getAccountPrefs();
+  prefs.noMusicOnStartup = isChecked;
+  saveAccountPrefs(prefs);
+
+  if (isChecked) {
+    disableMusicAutoplay();
+    showToast("🔇 Music will no longer auto-start on this account (synced)");
+  } else {
+    enableMusicAutoplay();
+    showToast("🔊 Music will auto-start again on this account (synced)");
+  }
+}
+
+async function applyAccountPrefsOnLogin() {
+  // Apply the locally cached prefs immediately so there's no flash of default settings
+  const localPrefs = getAccountPrefs();
+  applyThemePref(localPrefs.theme);
+  if (localPrefs.noMusicOnStartup) disableMusicAutoplay();
+
+  // Then reconcile with the cloud copy, in case prefs were changed on another device
+  const cloudPrefs = await fetchCloudPrefs();
+  if (!cloudPrefs) return;
+
+  const key = getPrefsAccountKey();
+  if (key) {
+    try { localStorage.setItem(`mtc_account_prefs_${key}`, JSON.stringify(cloudPrefs)); } catch (e) {}
+  }
+
+  applyThemePref(cloudPrefs.theme);
+  if (cloudPrefs.noMusicOnStartup) {
+    disableMusicAutoplay();
+  } else {
+    enableMusicAutoplay();
+  }
 }
 
 const AUTH_API = "https://mtc-backend-production-e0ab.up.railway.app/api";
@@ -2157,6 +2347,8 @@ function handleSearch(val) {
 let audioPlayer = null;
 let isScrubbing = false;
 let previousVolume = 0.5;
+let musicAutoplayHandler = null;
+let musicAutoplayDisabled = false;
 
 function initMusicPlayer() {
   audioPlayer = new Audio('assets/music.mp3');
@@ -2192,13 +2384,38 @@ function initMusicPlayer() {
     if (widget) widget.classList.remove('playing');
   });
 
-  const startAutoplay = () => {
+  musicAutoplayHandler = () => {
     audioPlayer.play().catch(() => {});
-    document.removeEventListener('click', startAutoplay);
-    document.removeEventListener('keydown', startAutoplay);
+    document.removeEventListener('click', musicAutoplayHandler);
+    document.removeEventListener('keydown', musicAutoplayHandler);
   };
-  document.addEventListener('click', startAutoplay, { once: true });
-  document.addEventListener('keydown', startAutoplay, { once: true });
+  if (!musicAutoplayDisabled) {
+    attachMusicAutoplayListeners();
+  }
+}
+
+function attachMusicAutoplayListeners() {
+  if (!musicAutoplayHandler) return;
+  document.addEventListener('click', musicAutoplayHandler, { once: true });
+  document.addEventListener('keydown', musicAutoplayHandler, { once: true });
+}
+
+function disableMusicAutoplay() {
+  musicAutoplayDisabled = true;
+  if (musicAutoplayHandler) {
+    document.removeEventListener('click', musicAutoplayHandler);
+    document.removeEventListener('keydown', musicAutoplayHandler);
+  }
+  if (audioPlayer && !audioPlayer.paused) {
+    audioPlayer.pause();
+  }
+}
+
+function enableMusicAutoplay() {
+  musicAutoplayDisabled = false;
+  if (audioPlayer && audioPlayer.paused) {
+    attachMusicAutoplayListeners();
+  }
 }
 
 function toggleMusicPlay() {
